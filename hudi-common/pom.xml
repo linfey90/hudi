@@ -270,6 +270,12 @@
       <artifactId>joda-time</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.avro</groupId>
+      <artifactId>avro</artifactId>
+      <version>1.10.0</version>
+<!--      <scope>compile</scope>-->
+    </dependency>
 
   </dependencies>
 </project>
