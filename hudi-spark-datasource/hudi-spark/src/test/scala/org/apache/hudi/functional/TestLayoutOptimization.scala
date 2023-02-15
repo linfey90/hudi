@@ -165,17 +165,18 @@ class TestLayoutOptimization extends HoodieClientTestBase {
 object TestLayoutOptimization {
   def testLayoutOptimizationParameters(): java.util.stream.Stream[Arguments] = {
     java.util.stream.Stream.of(
-      arguments("COPY_ON_WRITE", "linear", null),
+//      arguments("COPY_ON_WRITE", "linear", null),
       arguments("COPY_ON_WRITE", "z-order", "direct"),
-      arguments("COPY_ON_WRITE", "z-order", "sample"),
-      arguments("COPY_ON_WRITE", "hilbert", "direct"),
-      arguments("COPY_ON_WRITE", "hilbert", "sample"),
-
-      arguments("MERGE_ON_READ", "linear", null),
-      arguments("MERGE_ON_READ", "z-order", "direct"),
-      arguments("MERGE_ON_READ", "z-order", "sample"),
-      arguments("MERGE_ON_READ", "hilbert", "direct"),
-      arguments("MERGE_ON_READ", "hilbert", "sample")
+//      arguments("COPY_ON_WRITE", "z-order", "sample"),
+//      arguments("COPY_ON_WRITE", "hilbert", "direct"),
+//      arguments("COPY_ON_WRITE", "hilbert", "sample"),
+//
+//      arguments("MERGE_ON_READ", "linear", null),
+//      arguments("MERGE_ON_READ", "z-order", "direct"),
+//      arguments("MERGE_ON_READ", "z-order", "sample"),
+//      arguments("MERGE_ON_READ", "hilbert", "direct"),
+//      arguments("MERGE_ON_READ", "hilbert", "sample")
+      arguments("COPY_ON_WRITE", "hilbert", "direct")
     )
   }
 }

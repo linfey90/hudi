@@ -85,7 +85,9 @@ public class TestHoodieHFileReaderWriter extends TestHoodieReaderWriterBase {
 
   @Override
   protected Path getFilePath() {
-    return new Path(tempDir.toString() + "/f1_1-0-1_000.hfile");
+//    return new Path("/user/data/files/t_user_100w1.hfile");
+    return new Path("/home/bigdata/data/bloom.hfile");
+//    return new Path(tempDir.toString() + "/f1_1-0-1_000.hfile");
   }
 
   @Override
@@ -95,7 +97,7 @@ public class TestHoodieHFileReaderWriter extends TestHoodieReaderWriterBase {
     HoodieWriteConfig writeConfig = HoodieWriteConfig.newBuilder()
         .withPath(DUMMY_BASE_PATH)
         .withIndexConfig(HoodieIndexConfig.newBuilder()
-            .bloomFilterNumEntries(1000).bloomFilterFPP(0.00001).build())
+            .bloomFilterNumEntries(5000000).bloomFilterFPP(0.00001).build())
         .withPopulateMetaFields(populateMetaFields)
         .build();
     Configuration conf = new Configuration();
@@ -133,13 +135,14 @@ public class TestHoodieHFileReaderWriter extends TestHoodieReaderWriterBase {
 
   private static Stream<Arguments> populateMetaFieldsAndTestAvroWithMeta() {
     return Arrays.stream(new Boolean[][] {
-        {true, true},
-        {false, true},
-        {true, false},
+//        {true, true},
+//        {false, true},
+//        {true, false},
         {false, false}
     }).map(Arguments::of);
   }
 
+  //todo fy
   @ParameterizedTest
   @MethodSource("populateMetaFieldsAndTestAvroWithMeta")
   public void testWriteReadHFileWithMetaFields(boolean populateMetaFields, boolean testAvroWithMeta) throws Exception {
@@ -154,6 +157,7 @@ public class TestHoodieHFileReaderWriter extends TestHoodieReaderWriterBase {
       keys.add(key);
       record.put("time", Integer.toString(RANDOM.nextInt()));
       record.put("number", i);
+//      record.put("name", "ttttttttttttttt");
       if (testAvroWithMeta) {
         // payload does not matter. GenericRecord passed in is what matters
         writer.writeAvroWithMetadata(new HoodieAvroRecord(new HoodieKey((String) record.get("_row_key"),

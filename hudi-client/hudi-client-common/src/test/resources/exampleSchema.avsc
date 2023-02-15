@@ -21,16 +21,16 @@
     "name": "trip",
     "fields": [
         {
-            "name": "_row_key",
+            "name": "id",
             "type": "string"
         },
         {
-            "name": "time",
+            "name": "name",
             "type": "string"
         },
         {
-            "name": "number",
-            "type": ["int", "null"]
+            "name": "path",
+            "type": "string"
         }
     ]
 }
