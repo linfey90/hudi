@@ -20,15 +20,12 @@ package org.apache.hudi
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.hudi.HoodieBaseRelation.{BaseFileReader, convertToAvroSchema}
+import org.apache.hudi.HoodieBaseRelation.convertToAvroSchema
 import org.apache.hudi.HoodieConversionUtils.toScalaOption
-import org.apache.hudi.MergeOnReadSnapshotRelation.getFilePath
+import org.apache.hudi.MergeOnReadSnapshotRelation.{getFilePath, isProjectionCompatible}
 import org.apache.hudi.avro.HoodieAvroUtils
-import org.apache.hudi.common.fs.FSUtils.getRelativePartitionPath
-import org.apache.hudi.common.model.{FileSlice, HoodieLogFile}
+import org.apache.hudi.common.model.{FileSlice, HoodieLogFile, OverwriteWithLatestAvroPayload}
 import org.apache.hudi.common.table.HoodieTableMetaClient
-import org.apache.hudi.common.table.view.HoodieTableFileSystemView
-import org.apache.spark.execution.datasources.HoodieInMemoryFileIndex
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.InternalRow
@@ -42,12 +39,35 @@ import scala.collection.JavaConverters._
 case class HoodieMergeOnReadFileSplit(dataFile: Option[PartitionedFile],
                                       logFiles: List[HoodieLogFile]) extends HoodieFileSplit
 
-class MergeOnReadSnapshotRelation(sqlContext: SQLContext,
-                                  optParams: Map[String, String],
-                                  userSchema: Option[StructType],
-                                  globPaths: Seq[Path],
-                                  metaClient: HoodieTableMetaClient)
-  extends HoodieBaseRelation(sqlContext, metaClient, optParams, userSchema) {
+case class MergeOnReadSnapshotRelation(override val sqlContext: SQLContext,
+                                       override val optParams: Map[String, String],
+                                       override val metaClient: HoodieTableMetaClient,
+                                       private val globPaths: Seq[Path],
+                                       private val userSchema: Option[StructType],
+                                       private val prunedDataSchema: Option[StructType] = None)
+  extends BaseMergeOnReadSnapshotRelation(sqlContext, optParams, metaClient, globPaths, userSchema, prunedDataSchema) {
+
+  override type Relation = MergeOnReadSnapshotRelation
+
+  override def updatePrunedDataSchema(prunedSchema: StructType): MergeOnReadSnapshotRelation =
+    this.copy(prunedDataSchema = Some(prunedSchema))
+
+}
+
+/**
+ * Base implementation of the Merge-on-Read snapshot relation
+ *
+ * NOTE: Reason this is extracted as a standalone base class is such that both MOR
+ *       Snapshot and Incremental relations could inherit from it while both being Scala
+ *       case classes
+ */
+abstract class BaseMergeOnReadSnapshotRelation(sqlContext: SQLContext,
+                                               optParams: Map[String, String],
+                                               metaClient: HoodieTableMetaClient,
+                                               globPaths: Seq[Path],
+                                               userSchema: Option[StructType],
+                                               prunedDataSchema: Option[StructType])
+  extends HoodieBaseRelation(sqlContext, metaClient, optParams, userSchema, prunedDataSchema) {
 
   override type FileSplit = HoodieMergeOnReadFileSplit
 
@@ -75,6 +95,12 @@ class MergeOnReadSnapshotRelation(sqlContext: SQLContext,
   protected val mergeType: String = optParams.getOrElse(DataSourceReadOptions.REALTIME_MERGE.key,
     DataSourceReadOptions.REALTIME_MERGE.defaultValue)
 
+  /**
+   * Determines whether relation's schema could be pruned by Spark's Optimizer
+   */
+  override def canPruneRelationSchema: Boolean =
+    super.canPruneRelationSchema && isProjectionCompatible(tableState)
+
   override def imbueConfigs(sqlContext: SQLContext): Unit = {
     super.imbueConfigs(sqlContext)
     sqlContext.sparkSession.sessionState.conf.setConfString("spark.sql.parquet.enableVectorizedReader", "true")
@@ -89,7 +115,6 @@ class MergeOnReadSnapshotRelation(sqlContext: SQLContext,
     val optionalFilters = filters
     val readers = createBaseFileReaders(tableSchema, requiredSchema, requestedColumns, requiredFilters, optionalFilters)
 
-    val tableState = getTableState
     new HoodieMergeOnReadRDD(
       sqlContext.sparkContext,
       config = jobConf,
@@ -160,10 +185,10 @@ class MergeOnReadSnapshotRelation(sqlContext: SQLContext,
       )
     } else {
       val prunedRequiredSchema = {
-        val superfluousColumnNames = mandatoryColumns.filterNot(requestedColumns.contains)
+        val unusedMandatoryColumnNames = mandatoryColumns.filterNot(requestedColumns.contains)
         val prunedStructSchema =
           StructType(requiredDataSchema.structTypeSchema.fields
-            .filterNot(f => superfluousColumnNames.contains(f.name)))
+            .filterNot(f => unusedMandatoryColumnNames.contains(f.name)))
 
         HoodieTableSchema(prunedStructSchema, convertToAvroSchema(prunedStructSchema).toString)
       }
@@ -216,64 +241,24 @@ class MergeOnReadSnapshotRelation(sqlContext: SQLContext,
       HoodieMergeOnReadFileSplit(partitionedBaseFile, logFiles)
     }.toList
   }
-
-  protected def createMergeOnReadBaseFileReaders(partitionSchema: StructType,
-                                                 dataSchema: HoodieTableSchema,
-                                                 requiredDataSchema: HoodieTableSchema,
-                                                 requestedColumns: Array[String],
-                                                 filters: Array[Filter]): (BaseFileReader, BaseFileReader) = {
-    val requiredSchemaFileReaderMerging = createBaseFileReader(
-      spark = sqlContext.sparkSession,
-      partitionSchema = partitionSchema,
-      dataSchema = dataSchema,
-      requiredDataSchema = requiredDataSchema,
-      filters = filters,
-      options = optParams,
-      // NOTE: We have to fork the Hadoop Config here as Spark will be modifying it
-      //       to configure Parquet reader appropriately
-      hadoopConf = embedInternalSchema(new Configuration(conf), requiredDataSchema.internalSchema)
-    )
-
-    // Check whether fields required for merging were also requested to be fetched
-    // by the query:
-    //    - In case they were, there's no optimization we could apply here (we will have
-    //    to fetch such fields)
-    //    - In case they were not, we will provide 2 separate file-readers
-    //        a) One which would be applied to file-groups w/ delta-logs (merging)
-    //        b) One which would be applied to file-groups w/ no delta-logs or
-    //           in case query-mode is skipping merging
-    val requiredColumns = mandatoryFieldsForMerging.map(HoodieAvroUtils.getRootLevelFieldName)
-    if (requiredColumns.forall(requestedColumns.contains)) {
-      (requiredSchemaFileReaderMerging, requiredSchemaFileReaderMerging)
-    } else {
-      val prunedRequiredSchema = {
-        val superfluousColumnNames = requiredColumns.filterNot(requestedColumns.contains)
-        val prunedStructSchema =
-          StructType(requiredDataSchema.structTypeSchema.fields
-            .filterNot(f => superfluousColumnNames.contains(f.name)))
-
-        HoodieTableSchema(prunedStructSchema, convertToAvroSchema(prunedStructSchema).toString)
-      }
-
-      val requiredSchemaFileReaderNoMerging = createBaseFileReader(
-        spark = sqlContext.sparkSession,
-        partitionSchema = partitionSchema,
-        dataSchema = dataSchema,
-        requiredDataSchema = prunedRequiredSchema,
-        filters = filters,
-        options = optParams,
-        // NOTE: We have to fork the Hadoop Config here as Spark will be modifying it
-        //       to configure Parquet reader appropriately
-        hadoopConf = embedInternalSchema(new Configuration(conf), requiredDataSchema.internalSchema)
-      )
-
-      (requiredSchemaFileReaderMerging, requiredSchemaFileReaderNoMerging)
-    }
-  }
-
 }
 
 object MergeOnReadSnapshotRelation {
+
+  /**
+   * List of [[HoodieRecordPayload]] classes capable of merging projected records:
+   * in some cases, when for example, user is only interested in a handful of columns rather
+   * than the full row we will be able to optimize data throughput by only fetching the required
+   * columns. However, to properly fulfil MOR semantic particular [[HoodieRecordPayload]] in
+   * question should be able to merge records based on just such projected representation (including
+   * columns required for merging, such as primary-key, pre-combine key, etc)
+   */
+  private val projectionCompatiblePayloadClasses: Set[String] = Seq(
+    classOf[OverwriteWithLatestAvroPayload]
+  ).map(_.getName).toSet
+
+  def isProjectionCompatible(tableState: HoodieTableState): Boolean =
+    projectionCompatiblePayloadClasses.contains(tableState.recordPayloadClassName)
 
   def getFilePath(path: Path): String = {
     // Here we use the Path#toUri to encode the path string, as there is a decode in
