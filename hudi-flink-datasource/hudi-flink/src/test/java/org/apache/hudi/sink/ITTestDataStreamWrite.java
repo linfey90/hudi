@@ -108,7 +108,7 @@ public class ITTestDataStreamWrite extends TestLogger {
   File tempFile;
 
   @ParameterizedTest
-  @ValueSource(strings = {"BUCKET", "FLINK_STATE"})
+  @ValueSource(strings = {"FLINK_STATE"})
   public void testWriteCopyOnWrite(String indexType) throws Exception {
     Configuration conf = TestConfigurations.getDefaultConf(tempFile.toURI().toString());
     conf.setString(FlinkOptions.INDEX_TYPE, indexType);

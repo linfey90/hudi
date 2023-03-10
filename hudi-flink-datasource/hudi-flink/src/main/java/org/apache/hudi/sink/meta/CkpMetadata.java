@@ -81,6 +81,7 @@ public class CkpMetadata implements Serializable {
   private CkpMetadata(FileSystem fs, String basePath) {
     this.fs = fs;
     this.path = new Path(ckpMetaPath(basePath));
+//    this.path = new Path("s3a://test/hoodie_catalog/hudi_db/hudi_table/.hoodie/.aux/view_storage_conf.properties");
   }
 
   public void close() {
@@ -221,6 +222,9 @@ public class CkpMetadata implements Serializable {
   }
 
   private List<CkpMessage> scanCkpMetadata(Path ckpMetaPath) throws IOException {
+    if (!this.fs.exists(ckpMetaPath)) {
+      return new ArrayList<>();
+    }
     return Arrays.stream(this.fs.listStatus(ckpMetaPath)).map(CkpMessage::new)
         .collect(Collectors.groupingBy(CkpMessage::getInstant)).values().stream()
         .map(messages -> messages.stream().reduce((x, y) -> {
