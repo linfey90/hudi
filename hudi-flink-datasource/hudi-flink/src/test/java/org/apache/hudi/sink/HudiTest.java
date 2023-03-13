@@ -20,6 +20,7 @@
 package org.apache.hudi.sink;
 
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 
 @SuppressWarnings("checkstyle:HideUtilityClassConstructor")
@@ -73,9 +74,12 @@ public class HudiTest {
 
     //tblEnv.executeSql(String.format("select id,name from %s", tableName)).print();
     // 6.写入数据到表 flink_iceberg_tbl
-    tblEnv.executeSql("insert into hudi_table values "
-            + "(1,'aaa'),(2,'bbb'),(3,'ccc')");
-    //        "(3,'ggg'),(4,'ddd'),(5,'fff')");
+    tblEnv.executeSql("insert into hudi_table3 values " +
+//             "(1,'aaa'),(2,'bbb'),(3,'ccc')");
+            "(3,'ggg'),(4,'ddd'),(5,'fff')");
+
+//    TableResult result = tblEnv.executeSql(String.format("show create table %s", "hudi_table2"));
+//    System.out.println(result.collect().next());
 
 
   }
