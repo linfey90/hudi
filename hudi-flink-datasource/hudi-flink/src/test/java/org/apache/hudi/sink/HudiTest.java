@@ -19,6 +19,7 @@
 
 package org.apache.hudi.sink;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.TableResult;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
@@ -30,7 +31,9 @@ public class HudiTest {
 
   public static void main(String[] args) {
     System.setProperty("HADOOP_USER_NAME", "root");
-    StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+    Configuration conf = new Configuration();
+    conf.setString("fs.s3a.impl.disable.cache", "true");
+    StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment(conf);
     //env.setRuntimeMode(RuntimeExecutionMode.BATCH);
     env.setParallelism(1);
     StreamTableEnvironment tblEnv = StreamTableEnvironment.create(env);
@@ -72,15 +75,14 @@ public class HudiTest {
 //                "'table.type' = 'COPY_ON_WRITE'" +
 //                ")");
 
-    //tblEnv.executeSql(String.format("select id,name from %s", tableName)).print();
+    tblEnv.executeSql(String.format("select id,name from %s", "hudi_table")).print();
     // 6.写入数据到表 flink_iceberg_tbl
-    tblEnv.executeSql("insert into hudi_table3 values " +
+//    tblEnv.executeSql("insert into flink_append values " +
 //             "(1,'aaa'),(2,'bbb'),(3,'ccc')");
-            "(3,'ggg'),(4,'ddd'),(5,'fff')");
+//            "(3,'ggg'),(4,'ddd'),(5,'fff')");
 
-//    TableResult result = tblEnv.executeSql(String.format("show create table %s", "hudi_table2"));
+//    TableResult result = tblEnv.executeSql(String.format("show create table %s", "flink_append"));
 //    System.out.println(result.collect().next());
-
 
   }
 }

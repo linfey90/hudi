@@ -49,11 +49,7 @@ import org.apache.hudi.table.format.cow.CopyOnWriteInputFormat;
 import org.apache.hudi.table.format.mor.MergeOnReadInputFormat;
 import org.apache.hudi.table.format.mor.MergeOnReadInputSplit;
 import org.apache.hudi.table.format.mor.MergeOnReadTableState;
-import org.apache.hudi.util.AvroSchemaConverter;
-import org.apache.hudi.util.ChangelogModes;
-import org.apache.hudi.util.ExpressionUtils;
-import org.apache.hudi.util.InputFormats;
-import org.apache.hudi.util.StreamerUtil;
+import org.apache.hudi.util.*;
 
 import org.apache.avro.Schema;
 import org.apache.flink.annotation.VisibleForTesting;
@@ -167,7 +163,9 @@ public class HoodieTableSource implements
         ? IntStream.range(0, this.tableRowType.getFieldCount()).toArray()
         : requiredPos;
     this.limit = limit == null ? NO_LIMIT_CONSTANT : limit;
-    this.hadoopConf = HadoopConfigurations.getHadoopConf(conf);
+//    this.hadoopConf = HadoopConfigurations.getHadoopConf(conf);
+    this.hadoopConf = FlinkClientUtil.getHadoopConf();
+    conf.toMap().forEach(hadoopConf::set);
     this.metaClient = metaClient == null ? StreamerUtil.metaClientForReader(conf, hadoopConf) : metaClient;
     this.maxCompactionMemoryInBytes = StreamerUtil.getMaxCompactionMemoryInBytes(conf);
     this.internalSchemaManager = internalSchemaManager == null
