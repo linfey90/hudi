@@ -23,10 +23,10 @@ import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.configuration.FlinkOptions;
-import org.apache.hudi.configuration.HadoopConfigurations;
 import org.apache.hudi.source.stats.ColumnStatsIndices;
 import org.apache.hudi.source.stats.ExpressionEvaluator;
 import org.apache.hudi.util.DataTypeUtils;
+import org.apache.hudi.util.FlinkClientUtil;
 import org.apache.hudi.util.ExpressionUtils;
 import org.apache.hudi.util.StreamerUtil;
 
@@ -67,13 +67,16 @@ public class FileIndex {
   private List<String> partitionPaths;      // cache of partition paths
   private List<ResolvedExpression> filters; // push down filters
   private final boolean tableExists;
+  private final org.apache.hadoop.conf.Configuration hadoopConf;
 
   private FileIndex(Path path, Configuration conf, RowType rowType) {
     this.path = path;
     this.rowType = rowType;
     this.metadataConfig = metadataConfig(conf);
     this.dataSkippingEnabled = conf.getBoolean(FlinkOptions.READ_DATA_SKIPPING_ENABLED);
-    this.tableExists = StreamerUtil.tableExists(path.toString(), HadoopConfigurations.getHadoopConf(conf));
+    this.hadoopConf = FlinkClientUtil.getHadoopConf();
+    conf.toMap().forEach(hadoopConf::set);
+    this.tableExists = StreamerUtil.tableExists(path.toString(), hadoopConf);
   }
 
   public static FileIndex instance(Path path, Configuration conf, RowType rowType) {
@@ -137,7 +140,7 @@ public class FileIndex {
       return new FileStatus[0];
     }
     String[] partitions = getOrBuildPartitionPaths().stream().map(p -> fullPartitionPath(path, p)).toArray(String[]::new);
-    FileStatus[] allFileStatus = FSUtils.getFilesInPartitions(HoodieFlinkEngineContext.DEFAULT, metadataConfig, path.toString(),
+    FileStatus[] allFileStatus = FSUtils.getFilesInPartitions(new HoodieFlinkEngineContext(this.hadoopConf), metadataConfig, path.toString(),
             partitions)
         .values().stream().flatMap(Arrays::stream).toArray(FileStatus[]::new);
     Set<String> candidateFiles = candidateFilesInMetadataTable(allFileStatus);
@@ -285,7 +288,7 @@ public class FileIndex {
       return this.partitionPaths;
     }
     this.partitionPaths = this.tableExists
-        ? FSUtils.getAllPartitionPaths(HoodieFlinkEngineContext.DEFAULT, metadataConfig, path.toString())
+        ? FSUtils.getAllPartitionPaths(new HoodieFlinkEngineContext(this.hadoopConf), metadataConfig, path.toString())
         : Collections.emptyList();
     return this.partitionPaths;
   }

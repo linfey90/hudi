@@ -167,7 +167,7 @@ public class StreamWriteOperatorCoordinator
     this.conf = conf;
     this.context = context;
     this.parallelism = context.currentParallelism();
-    this.hiveConf = new SerializableConfiguration(HadoopConfigurations.getHiveConf(conf));
+    this.hiveConf = new SerializableConfiguration(HadoopConfigurations.getAllHiveConf(conf));
   }
 
   @Override

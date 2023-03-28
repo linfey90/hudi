@@ -167,7 +167,9 @@ public class HoodieTableSource implements
         ? IntStream.range(0, this.tableRowType.getFieldCount()).toArray()
         : requiredPos;
     this.limit = limit == null ? NO_LIMIT_CONSTANT : limit;
+    // merge conf
     this.hadoopConf = HadoopConfigurations.getHadoopConf(conf);
+    conf.toMap().forEach(this.hadoopConf::set);
     this.metaClient = metaClient == null ? StreamerUtil.metaClientForReader(conf, hadoopConf) : metaClient;
     this.maxCompactionMemoryInBytes = StreamerUtil.getMaxCompactionMemoryInBytes(conf);
     this.internalSchemaManager = internalSchemaManager == null
