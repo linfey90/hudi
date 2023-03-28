@@ -186,7 +186,7 @@ public class StreamerUtil {
    * @throws IOException if errors happens when writing metadata
    */
   public static HoodieTableMetaClient initTableIfNotExists(Configuration conf) throws IOException {
-    return initTableIfNotExists(conf, HadoopConfigurations.getHadoopConf(conf));
+    return initTableIfNotExists(conf, HadoopConfigurations.getAllHadoopConf(conf));
   }
 
   /**
@@ -296,7 +296,7 @@ public class StreamerUtil {
    * Creates the meta client.
    */
   public static HoodieTableMetaClient createMetaClient(Configuration conf) {
-    return createMetaClient(conf.getString(FlinkOptions.PATH), HadoopConfigurations.getHadoopConf(conf));
+    return createMetaClient(conf.getString(FlinkOptions.PATH), HadoopConfigurations.getAllHadoopConf(conf));
   }
 
   /**

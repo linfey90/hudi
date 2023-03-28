@@ -117,7 +117,7 @@ public class BucketAssignFunction<K, I, O extends HoodieRecord<?>>
     super.open(parameters);
     HoodieWriteConfig writeConfig = FlinkWriteClients.getHoodieClientConfig(this.conf, true);
     HoodieFlinkEngineContext context = new HoodieFlinkEngineContext(
-        new SerializableConfiguration(HadoopConfigurations.getHadoopConf(this.conf)),
+        new SerializableConfiguration(HadoopConfigurations.getAllHadoopConf(this.conf)),
         new FlinkTaskContextSupplier(getRuntimeContext()));
     this.bucketAssigner = BucketAssigners.create(
         getRuntimeContext().getIndexOfThisSubtask(),

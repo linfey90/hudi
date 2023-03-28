@@ -34,6 +34,7 @@ import org.apache.hudi.exception.HoodieCatalogException;
 import org.apache.hudi.exception.HoodieMetadataException;
 import org.apache.hudi.hadoop.utils.HoodieInputFormatUtils;
 import org.apache.hudi.sync.common.util.ConfigUtils;
+import org.apache.hudi.table.HoodieTableFactory;
 import org.apache.hudi.table.format.FilePathUtils;
 import org.apache.hudi.util.AvroSchemaConverter;
 import org.apache.hudi.util.DataTypeUtils;
@@ -74,6 +75,7 @@ import org.apache.flink.table.catalog.exceptions.TablePartitionedException;
 import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
 import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.expressions.Expression;
+import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.types.DataType;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -102,6 +104,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.apache.flink.sql.parser.hive.ddl.SqlAlterHiveDatabase.ALTER_DATABASE_OP;
 import static org.apache.flink.sql.parser.hive.ddl.SqlAlterHiveDatabaseOwner.DATABASE_OWNER_NAME;
@@ -152,6 +155,11 @@ public class HoodieHiveCatalog extends AbstractCatalog {
   }
 
   @Override
+  public Optional<Factory> getFactory() {
+    return Optional.of(new HoodieTableFactory(this));
+  }
+
+  @Override
   public void open() throws CatalogException {
     if (this.client == null) {
       try {
@@ -160,15 +168,6 @@ public class HoodieHiveCatalog extends AbstractCatalog {
         throw new HoodieCatalogException("Failed to create hive metastore client", e);
       }
       LOG.info("Connected to Hive metastore");
-    }
-    if (!databaseExists(getDefaultDatabase())) {
-      LOG.info("{} does not exist, will be created.", getDefaultDatabase());
-      CatalogDatabase database = new CatalogDatabaseImpl(Collections.emptyMap(), "default database");
-      try {
-        createDatabase(getDefaultDatabase(), database, true);
-      } catch (DatabaseAlreadyExistException e) {
-        throw new HoodieCatalogException(getName(), e);
-      }
     }
   }
 
