@@ -154,6 +154,15 @@
                 </includes>
               </artifactSet>
               <relocations combine.children="append">
+                <relocation>
+                  <pattern>org.apache.parquet.</pattern>
+                  <shadedPattern>org.apache.hudi.org.apache.parquet.</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>org.apache.flink.formats.parquet.</pattern>
+                  <shadedPattern>org.apache.hudi.org.apache.flink.formats.parquet.</shadedPattern>
+                </relocation>
+
                 <!-- Kryo -->
                 <relocation>
                   <pattern>com.esotericsoftware.kryo.</pattern>
