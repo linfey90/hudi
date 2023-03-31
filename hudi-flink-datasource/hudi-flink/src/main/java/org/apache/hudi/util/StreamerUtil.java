@@ -94,7 +94,7 @@ public class StreamerUtil {
       return new TypedProperties();
     }
     return readConfig(
-        HadoopConfigurations.getHadoopConf(cfg),
+        HadoopConfigurations.getAllHadoopConf(cfg),
         new Path(cfg.propsFilePath), cfg.configs).getProps();
   }
 

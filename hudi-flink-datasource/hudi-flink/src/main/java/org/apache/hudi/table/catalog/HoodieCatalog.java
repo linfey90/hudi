@@ -109,7 +109,7 @@ public class HoodieCatalog extends AbstractCatalog {
     options.getOptional(CATALOG_PATH).orElseThrow(() ->
         new ValidationException("Option [catalog.path] should not be empty."));
     this.catalogPathStr = options.get(CATALOG_PATH);
-    this.hadoopConf = HadoopConfigurations.getHadoopConf(options);
+    this.hadoopConf = HadoopConfigurations.getAllHadoopConf(options);
     this.tableCommonOptions = CatalogOptions.tableCommonOptions(options);
   }
 

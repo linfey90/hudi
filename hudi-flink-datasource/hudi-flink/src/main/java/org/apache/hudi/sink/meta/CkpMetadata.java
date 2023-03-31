@@ -76,7 +76,7 @@ public class CkpMetadata implements Serializable {
   private List<String> instantCache;
 
   private CkpMetadata(Configuration config) {
-    this(FSUtils.getFs(config.getString(FlinkOptions.PATH), HadoopConfigurations.getHadoopConf(config)),
+    this(FSUtils.getFs(config.getString(FlinkOptions.PATH), HadoopConfigurations.getAllHadoopConf(config)),
         config.getString(FlinkOptions.PATH), config.getString(FlinkOptions.WRITE_CLIENT_ID));
   }
 
