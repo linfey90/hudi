@@ -181,7 +181,7 @@ public class MergeOnReadInputFormat
   public void open(MergeOnReadInputSplit split) throws IOException {
     this.currentReadCount = 0L;
     this.closed = false;
-    this.hadoopConf = HadoopConfigurations.getHadoopConf(this.conf);
+    this.hadoopConf = HadoopConfigurations.getAllHadoopConf(this.conf);
     this.iterator = initIterator(split);
     mayShiftInputSplit(split);
   }

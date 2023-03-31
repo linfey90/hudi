@@ -962,7 +962,7 @@ public class HoodieHiveCatalog extends AbstractCatalog {
       return options;
     } else {
       Map<String, String> newOptions = new HashMap<>(options);
-      // set up hive sync options
+      // todo fy set up hive sync options
       newOptions.putIfAbsent(FlinkOptions.HIVE_SYNC_ENABLED.key(), "true");
       newOptions.putIfAbsent(FlinkOptions.HIVE_SYNC_METASTORE_URIS.key(), hiveConf.getVar(HiveConf.ConfVars.METASTOREURIS));
       newOptions.putIfAbsent(FlinkOptions.HIVE_SYNC_MODE.key(), "hms");

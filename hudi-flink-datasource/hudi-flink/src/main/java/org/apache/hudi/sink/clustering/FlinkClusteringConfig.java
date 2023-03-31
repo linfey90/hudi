@@ -147,7 +147,7 @@ public class FlinkClusteringConfig extends Configuration {
   public static TypedProperties getProps(FlinkClusteringConfig cfg) {
     return cfg.propsFilePath.isEmpty()
         ? buildProperties(cfg.configs)
-        : StreamerUtil.readConfig(HadoopConfigurations.getHadoopConf(cfg),
+        : StreamerUtil.readConfig(HadoopConfigurations.getAllHadoopConf(cfg),
             new Path(cfg.propsFilePath), cfg.configs).getProps();
   }
 
