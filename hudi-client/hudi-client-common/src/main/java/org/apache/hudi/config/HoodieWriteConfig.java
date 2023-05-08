@@ -68,7 +68,6 @@ import org.apache.hudi.index.HoodieIndex;
 import org.apache.hudi.keygen.SimpleAvroKeyGenerator;
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions;
 import org.apache.hudi.keygen.constant.KeyGeneratorType;
-import org.apache.hudi.metadata.HoodieTableMetadata;
 import org.apache.hudi.metrics.MetricsReporterType;
 import org.apache.hudi.metrics.datadog.DatadogHttpClient.ApiSite;
 import org.apache.hudi.table.RandomFileIdPrefixProvider;
@@ -128,12 +127,6 @@ public class HoodieWriteConfig extends HoodieConfig {
       .noDefaultValue()
       .withDocumentation("Table name that will be used for registering with metastores like HMS. Needs to be same across runs.");
 
-  public static final ConfigProperty<String> TAGGED_RECORD_STORAGE_LEVEL_VALUE = ConfigProperty
-       .key("hoodie.write.tagged.record.storage.level")
-       .defaultValue("MEMORY_AND_DISK_SER")
-       .withDocumentation("Determine what level of persistence is used to cache write RDDs. "
-          + "Refer to org.apache.spark.storage.StorageLevel for different values");
-
   public static final ConfigProperty<String> PRECOMBINE_FIELD_NAME = ConfigProperty
       .key("hoodie.datasource.write.precombine.field")
       .defaultValue("ts")
@@ -172,11 +165,11 @@ public class HoodieWriteConfig extends HoodieConfig {
       .withValidValues(Arrays.stream(ExecutorType.values()).map(Enum::name).toArray(String[]::new))
       .sinceVersion("0.13.0")
       .withDocumentation("Set executor which orchestrates concurrent producers and consumers communicating through a message queue."
-          + "BOUNDED_IN_MEMORY: Use LinkedBlockingQueue as a bounded in-memory queue, this queue will use extra lock to balance producers and consumer"
+          + "BOUNDED_IN_MEMORY(default): Use LinkedBlockingQueue as a bounded in-memory queue, this queue will use extra lock to balance producers and consumer"
           + "DISRUPTOR: Use disruptor which a lock free message queue as inner message, this queue may gain better writing performance if lock was the bottleneck. "
-          + "SIMPLE(default): Executor with no inner message queue and no inner lock. Consuming and writing records from iterator directly. Compared with BIM and DISRUPTOR, "
+          + "SIMPLE: Executor with no inner message queue and no inner lock. Consuming and writing records from iterator directly. Compared with BIM and DISRUPTOR, "
           + "this queue has no need for additional memory and cpu resources due to lock or multithreading, but also lost some benefits such as speed limit. "
-          + "Although DISRUPTOR is still experimental.");
+          + "Although DISRUPTOR_EXECUTOR and SIMPLE are still in experimental.");
 
   public static final ConfigProperty<String> KEYGENERATOR_TYPE = ConfigProperty
       .key("hoodie.datasource.write.keygenerator.type")
@@ -233,7 +226,7 @@ public class HoodieWriteConfig extends HoodieConfig {
 
   public static final ConfigProperty<String> AVRO_SCHEMA_VALIDATE_ENABLE = ConfigProperty
       .key("hoodie.avro.schema.validate")
-      .defaultValue("true")
+      .defaultValue("false")
       .withDocumentation("Validate the schema used for the write against the latest schema, for backwards compatibility.");
 
   public static final ConfigProperty<String> SCHEMA_ALLOW_AUTO_EVOLUTION_COLUMN_DROP = ConfigProperty
@@ -621,19 +614,6 @@ public class HoodieWriteConfig extends HoodieConfig {
       .withDocumentation("Whether to enable commit conflict checking or not during early "
           + "conflict detection.");
 
-  public static final ConfigProperty<String> MUTLI_WRITER_SOURCE_CHECKPOINT_ID = ConfigProperty
-      .key("hoodie.deltastreamer.multiwriter.source.checkpoint.id")
-      .noDefaultValue()
-      .withDocumentation("Unique Id to be used for multiwriter deltastreamer scenario. This is the "
-          + "scenario when multiple deltastreamers are used to write to the same target table. If you are just using "
-          + "a single deltastreamer for a table then you do not need to set this config.");
-
-  public static final ConfigProperty<String> SENSITIVE_CONFIG_KEYS_FILTER = ConfigProperty
-      .key("hoodie.sensitive.config.keys")
-      .defaultValue("ssl,tls,sasl,auth,credentials")
-      .withDocumentation("Comma separated list of filters for sensitive config keys. Delta Streamer "
-          + "will not print any configuration which contains the configured filter. For example with "
-          + "a configured filter `ssl`, value for config `ssl.trustore.location` would be masked.");
 
   private ConsistencyGuardConfig consistencyGuardConfig;
   private FileSystemRetryConfig fileSystemRetryConfig;
@@ -1087,10 +1067,6 @@ public class HoodieWriteConfig extends HoodieConfig {
       return getString(WRITE_SCHEMA_OVERRIDE);
     }
     return getSchema();
-  }
-
-  public String getTaggedRecordStorageLevel() {
-    return getString(TAGGED_RECORD_STORAGE_LEVEL_VALUE);
   }
 
   public String getInternalSchema() {
@@ -1615,20 +1591,8 @@ public class HoodieWriteConfig extends HoodieConfig {
     return getInt(HoodieClusteringConfig.PLAN_STRATEGY_SKIP_PARTITIONS_FROM_LATEST);
   }
 
-  public boolean isSingleGroupClusteringEnabled() {
-    return getBoolean(HoodieClusteringConfig.PLAN_STRATEGY_SINGLE_GROUP_CLUSTERING_ENABLED);
-  }
-
-  public boolean shouldClusteringSingleGroup() {
-    return isClusteringSortEnabled() || isSingleGroupClusteringEnabled();
-  }
-
   public String getClusteringSortColumns() {
     return getString(HoodieClusteringConfig.PLAN_STRATEGY_SORT_COLUMNS);
-  }
-
-  public boolean isClusteringSortEnabled() {
-    return !StringUtils.isNullOrEmpty(getString(HoodieClusteringConfig.PLAN_STRATEGY_SORT_COLUMNS));
   }
 
   public HoodieClusteringConfig.LayoutOptimizationStrategy getLayoutOptimizationStrategy() {
@@ -2112,20 +2076,12 @@ public class HoodieWriteConfig extends HoodieConfig {
     return getString(HoodieMetricsPrometheusConfig.PUSHGATEWAY_JOBNAME);
   }
 
-  public String getPushGatewayLabels() {
-    return getString(HoodieMetricsPrometheusConfig.PUSHGATEWAY_LABELS);
-  }
-
   public boolean getPushGatewayRandomJobNameSuffix() {
     return getBoolean(HoodieMetricsPrometheusConfig.PUSHGATEWAY_RANDOM_JOBNAME_SUFFIX);
   }
 
   public String getMetricReporterMetricsNamePrefix() {
     return getStringOrDefault(HoodieMetricsConfig.METRICS_REPORTER_PREFIX);
-  }
-
-  public String getMetricReporterFileBasedConfigs() {
-    return getStringOrDefault(HoodieMetricsConfig.METRICS_REPORTER_FILE_BASED_CONFIGS_PATH);
   }
 
   /**
@@ -2136,8 +2092,7 @@ public class HoodieWriteConfig extends HoodieConfig {
   }
 
   public String getSpillableMapBasePath() {
-    return Option.ofNullable(getString(HoodieMemoryConfig.SPILLABLE_MAP_BASE_PATH))
-        .orElseGet(HoodieMemoryConfig::getDefaultSpillableMapBasePath);
+    return getString(HoodieMemoryConfig.SPILLABLE_MAP_BASE_PATH);
   }
 
   public double getWriteStatusFailureFraction() {
@@ -2404,13 +2359,6 @@ public class HoodieWriteConfig extends HoodieConfig {
 
   public boolean areReleaseResourceEnabled() {
     return getBooleanOrDefault(RELEASE_RESOURCE_ENABLE);
-  }
-
-  /**
-   * Returns whether the explicit guard of lock is required.
-   */
-  public boolean needsLockGuard() {
-    return isMetadataTableEnabled() || getWriteConcurrencyMode().supportsOptimisticConcurrencyControl();
   }
 
   /**
@@ -2954,7 +2902,8 @@ public class HoodieWriteConfig extends HoodieConfig {
 
       // isLockProviderPropertySet must be fetched before setting defaults of HoodieLockConfig
       final TypedProperties writeConfigProperties = writeConfig.getProps();
-      final boolean isLockProviderPropertySet = writeConfigProperties.containsKey(HoodieLockConfig.LOCK_PROVIDER_CLASS_NAME.key());
+      final boolean isLockProviderPropertySet = writeConfigProperties.containsKey(HoodieLockConfig.LOCK_PROVIDER_CLASS_NAME)
+          || writeConfigProperties.containsKey(HoodieLockConfig.LOCK_PROVIDER_CLASS_PROP);
       writeConfig.setDefaultOnCondition(!isLockConfigSet,
           HoodieLockConfig.newBuilder().fromProperties(writeConfig.getProps()).build());
 
@@ -2978,10 +2927,13 @@ public class HoodieWriteConfig extends HoodieConfig {
             // This is targeted at Single writer with async table services
             // If user does not set the lock provider, likely that the concurrency mode is not set either
             // Override the configs for metadata table
+            writeConfig.setValue(WRITE_CONCURRENCY_MODE.key(),
+                WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL.value());
             writeConfig.setValue(HoodieLockConfig.LOCK_PROVIDER_CLASS_NAME.key(),
                 InProcessLockProvider.class.getName());
-            LOG.info(String.format("Automatically set %s=%s since user has not set the "
+            LOG.info(String.format("Automatically set %s=%s and %s=%s since user has not set the "
                     + "lock provider for single writer with async table services",
+                WRITE_CONCURRENCY_MODE.key(), WriteConcurrencyMode.OPTIMISTIC_CONCURRENCY_CONTROL.value(),
                 HoodieLockConfig.LOCK_PROVIDER_CLASS_NAME.key(), InProcessLockProvider.class.getName()));
           }
         }
@@ -3063,9 +3015,7 @@ public class HoodieWriteConfig extends HoodieConfig {
           if (writeConfig.isEmbeddedTimelineServerEnabled()) {
             return MarkerType.TIMELINE_SERVER_BASED.toString();
           } else {
-            if (!HoodieTableMetadata.isMetadataTable(writeConfig.getBasePath())) {
-              LOG.warn("Embedded timeline server is disabled, fallback to use direct marker type for spark");
-            }
+            LOG.warn("Embedded timeline server is disabled, fallback to use direct marker type for spark");
             return MarkerType.DIRECT.toString();
           }
         case FLINK:

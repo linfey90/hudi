@@ -25,7 +25,6 @@ import org.apache.hudi.HoodieConversionUtils.toScalaOption
 import org.apache.hudi.common.table.HoodieTableMetaClient
 import org.apache.hudi.secondary.index.SecondaryIndexManager
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.catalog.CatalogTable
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.{QualifiedTableName, TableIdentifier}
 import org.apache.spark.sql.hudi.HoodieSqlCommonUtils.getTableLocation
@@ -35,16 +34,16 @@ import java.util
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, mapAsJavaMapConverter}
 
-case class CreateIndexCommand(table: CatalogTable,
-                              indexName: String,
-                              indexType: String,
-                              ignoreIfExists: Boolean,
-                              columns: Seq[(Attribute, Map[String, String])],
-                              options: Map[String, String],
-                              override val output: Seq[Attribute]) extends IndexBaseCommand {
+case class CreateIndexCommand(
+    tableId: TableIdentifier,
+    indexName: String,
+    indexType: String,
+    ignoreIfExists: Boolean,
+    columns: Seq[(Attribute, Map[String, String])],
+    options: Map[String, String],
+    override val output: Seq[Attribute]) extends IndexBaseCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
-    val tableId = table.identifier
     val metaClient = createHoodieTableMetaClient(tableId, sparkSession)
     val columnsMap: java.util.LinkedHashMap[String, java.util.Map[String, String]] =
       new util.LinkedHashMap[String, java.util.Map[String, String]]()
@@ -63,13 +62,13 @@ case class CreateIndexCommand(table: CatalogTable,
   }
 }
 
-case class DropIndexCommand(table: CatalogTable,
-                            indexName: String,
-                            ignoreIfNotExists: Boolean,
-                            override val output: Seq[Attribute]) extends IndexBaseCommand {
+case class DropIndexCommand(
+    tableId: TableIdentifier,
+    indexName: String,
+    ignoreIfNotExists: Boolean,
+    override val output: Seq[Attribute]) extends IndexBaseCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
-    val tableId = table.identifier
     val metaClient = createHoodieTableMetaClient(tableId, sparkSession)
     SecondaryIndexManager.getInstance().drop(metaClient, indexName, ignoreIfNotExists)
 
@@ -83,11 +82,12 @@ case class DropIndexCommand(table: CatalogTable,
   }
 }
 
-case class ShowIndexesCommand(table: CatalogTable,
-                              override val output: Seq[Attribute]) extends IndexBaseCommand {
+case class ShowIndexesCommand(
+    tableId: TableIdentifier,
+    override val output: Seq[Attribute]) extends IndexBaseCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
-    val metaClient = createHoodieTableMetaClient(table.identifier, sparkSession)
+    val metaClient = createHoodieTableMetaClient(tableId, sparkSession)
     val secondaryIndexes = SecondaryIndexManager.getInstance().show(metaClient)
 
     val mapper = getObjectMapper
@@ -109,12 +109,13 @@ case class ShowIndexesCommand(table: CatalogTable,
   }
 }
 
-case class RefreshIndexCommand(table: CatalogTable,
-                               indexName: String,
-                               override val output: Seq[Attribute]) extends IndexBaseCommand {
+case class RefreshIndexCommand(
+    tableId: TableIdentifier,
+    indexName: String,
+    override val output: Seq[Attribute]) extends IndexBaseCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
-    val metaClient = createHoodieTableMetaClient(table.identifier, sparkSession)
+    val metaClient = createHoodieTableMetaClient(tableId, sparkSession)
     SecondaryIndexManager.getInstance().refresh(metaClient, indexName)
     Seq.empty
   }

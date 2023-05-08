@@ -150,8 +150,7 @@ public class SparkHoodieBackedTableMetadataWriter extends HoodieBackedTableMetad
     engineContext.setJobStatus(this.getClass().getName(), "Committing " + instantTime + " to metadata table " + metadataWriteConfig.getTableName());
     try (SparkRDDWriteClient writeClient = new SparkRDDWriteClient(engineContext, metadataWriteConfig)) {
       // rollback partially failed writes if any.
-      if (dataWriteConfig.getFailedWritesCleanPolicy().isEager()
-          && writeClient.rollbackFailedWrites()) {
+      if (writeClient.rollbackFailedWrites()) {
         metadataMetaClient = HoodieTableMetaClient.reload(metadataMetaClient);
       }
       if (canTriggerTableService) {

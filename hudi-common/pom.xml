@@ -19,7 +19,7 @@
   <parent>
     <artifactId>hudi</artifactId>
     <groupId>org.apache.hudi</groupId>
-    <version>0.14.0-SNAPSHOT</version>
+    <version>0.13.0</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
@@ -258,13 +258,7 @@
         </exclusion>
       </exclusions>
     </dependency>
-
-    <dependency>
-      <groupId>org.apache.hbase.thirdparty</groupId>
-      <artifactId>hbase-unsafe</artifactId>
-      <version>4.1.4</version>
-    </dependency>
-
+    
     <dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-server</artifactId>
@@ -290,13 +284,6 @@
         </exclusion>
       </exclusions>
     </dependency>
-
-<!-- Force to use 2.11.0 since hbase-server requires 2.7+ -->
-   <dependency>
-     <groupId>commons-io</groupId>
-     <artifactId>commons-io</artifactId>
-     <version>${commons.io.version}</version>
-   </dependency>
 
     <!-- LZ4 Hash Utils -->
     <dependency>

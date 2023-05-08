@@ -33,7 +33,6 @@ import org.apache.hudi.configuration.FlinkOptions;
 import org.apache.hudi.configuration.HadoopConfigurations;
 import org.apache.hudi.configuration.OptionsResolver;
 import org.apache.hudi.exception.HoodieException;
-import org.apache.hudi.hive.HiveSyncTool;
 import org.apache.hudi.sink.event.CommitAckEvent;
 import org.apache.hudi.sink.event.WriteMetadataEvent;
 import org.apache.hudi.sink.meta.CkpMetadata;
@@ -42,6 +41,7 @@ import org.apache.hudi.sink.utils.NonThrownExecutor;
 import org.apache.hudi.util.ClusteringUtil;
 import org.apache.hudi.util.CompactionUtil;
 import org.apache.hudi.util.FlinkWriteClients;
+import org.apache.hudi.util.StreamerUtil;
 
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.configuration.Configuration;
@@ -167,7 +167,7 @@ public class StreamWriteOperatorCoordinator
     this.conf = conf;
     this.context = context;
     this.parallelism = context.currentParallelism();
-    this.hiveConf = new SerializableConfiguration(HadoopConfigurations.getAllHiveConf(conf));
+    this.hiveConf = new SerializableConfiguration(HadoopConfigurations.getHiveConf(conf));
   }
 
   @Override
@@ -180,7 +180,7 @@ public class StreamWriteOperatorCoordinator
     this.gateways = new SubtaskGateway[this.parallelism];
     // init table, create if not exists.
     this.metaClient = initTableIfNotExists(this.conf);
-    this.ckpMetadata = initCkpMetadata(this.metaClient, this.conf);
+    this.ckpMetadata = initCkpMetadata(this.metaClient);
     // the write client must create after the table creation
     this.writeClient = FlinkWriteClients.createWriteClient(conf);
     initMetadataTable(this.writeClient);
@@ -335,17 +335,15 @@ public class StreamWriteOperatorCoordinator
    * Sync hoodie table metadata to Hive metastore.
    */
   public void doSyncHive() {
-    try (HiveSyncTool syncTool = hiveSyncContext.hiveSyncTool()) {
-      syncTool.syncHoodieTable();
-    }
+    hiveSyncContext.hiveSyncTool().syncHoodieTable();
   }
 
   private static void initMetadataTable(HoodieFlinkWriteClient<?> writeClient) {
     writeClient.initMetadataTable();
   }
 
-  private static CkpMetadata initCkpMetadata(HoodieTableMetaClient metaClient, Configuration conf) throws IOException {
-    CkpMetadata ckpMetadata = CkpMetadata.getInstance(metaClient, conf.getString(FlinkOptions.WRITE_CLIENT_ID));
+  private static CkpMetadata initCkpMetadata(HoodieTableMetaClient metaClient) throws IOException {
+    CkpMetadata ckpMetadata = CkpMetadata.getInstance(metaClient.getFs(), metaClient.getBasePath());
     ckpMetadata.bootstrap();
     return ckpMetadata;
   }
@@ -374,8 +372,6 @@ public class StreamWriteOperatorCoordinator
   }
 
   private void startInstant() {
-    // refresh the last txn metadata
-    this.writeClient.preTxn(this.metaClient);
     // put the assignment in front of metadata generation,
     // because the instant request from write task is asynchronous.
     this.instant = this.writeClient.startCommit(tableState.commitAction, this.metaClient);
@@ -395,7 +391,8 @@ public class StreamWriteOperatorCoordinator
    * until it finds a new inflight instant on the timeline.
    */
   private void initInstant(String instant) {
-    HoodieTimeline completedTimeline = this.metaClient.getActiveTimeline().filterCompletedInstants();
+    HoodieTimeline completedTimeline =
+        StreamerUtil.createMetaClient(conf).getActiveTimeline().filterCompletedInstants();
     executor.execute(() -> {
       if (instant.equals(WriteMetadataEvent.BOOTSTRAP_INSTANT) || completedTimeline.containsInstant(instant)) {
         // the last instant committed successfully

@@ -29,7 +29,6 @@ import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.common.util.collection.ImmutablePair;
 import org.apache.hudi.common.util.collection.Pair;
-import org.apache.hudi.hive.ddl.HiveSyncMode;
 import org.apache.hudi.hive.testutils.HiveTestUtil;
 import org.apache.hudi.sync.common.model.FieldSchema;
 import org.apache.hudi.sync.common.model.Partition;
@@ -53,7 +52,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -192,7 +190,7 @@ public class TestHiveSyncTool {
     String instantTime = "100";
     // create a cow table and sync to hive
     HiveTestUtil.createCOWTable(instantTime, 1, useSchemaFromCommitMetadata);
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
     assertTrue(hiveClient.tableExists(HiveTestUtil.TABLE_NAME),
         "Table " + HiveTestUtil.TABLE_NAME + " should exist after sync completes");
@@ -209,7 +207,7 @@ public class TestHiveSyncTool {
     basePath = Files.createTempDirectory("hivesynctest" + Instant.now().toEpochMilli()).toUri().toString();
     hiveSyncProps.setProperty(META_SYNC_BASE_PATH.key(), basePath);
     HiveTestUtil.createCOWTable(instantTime, 1, useSchemaFromCommitMetadata);
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
     client.reconnect();
     Option<String> newLocationOption = getMetastoreLocation(client, HiveTestUtil.DB_NAME, HiveTestUtil.TABLE_NAME);
@@ -239,7 +237,7 @@ public class TestHiveSyncTool {
     String instantTime = "100";
     HiveTestUtil.createCOWTable(instantTime, 5, useSchemaFromCommitMetadata);
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     assertFalse(hiveClient.tableExists(HiveTestUtil.TABLE_NAME),
         "Table " + HiveTestUtil.TABLE_NAME + " should not exist initially");
     // Lets do the sync
@@ -311,20 +309,20 @@ public class TestHiveSyncTool {
 
     // while autoCreateDatabase is false and database not exists;
     hiveSyncProps.setProperty(HIVE_AUTO_CREATE_DATABASE.key(), "false");
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     // Lets do the sync
     assertThrows(Exception.class, (this::reSyncHiveTable));
 
     // while autoCreateDatabase is true and database not exists;
     hiveSyncProps.setProperty(HIVE_AUTO_CREATE_DATABASE.key(), "true");
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     assertDoesNotThrow((this::reSyncHiveTable));
     assertTrue(hiveClient.databaseExists(HiveTestUtil.DB_NAME),
         "DataBases " + HiveTestUtil.DB_NAME + " should exist after sync completes");
 
     // while autoCreateDatabase is false and database exists;
     hiveSyncProps.setProperty(HIVE_AUTO_CREATE_DATABASE.key(), "false");
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     assertDoesNotThrow((this::reSyncHiveTable));
     assertTrue(hiveClient.databaseExists(HiveTestUtil.DB_NAME),
         "DataBases " + HiveTestUtil.DB_NAME + " should exist after sync completes");
@@ -363,7 +361,7 @@ public class TestHiveSyncTool {
     String instantTime = "100";
     HiveTestUtil.createCOWTable(instantTime, 5, useSchemaFromCommitMetadata);
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
 
     SessionState.start(HiveTestUtil.getHiveConf());
@@ -395,32 +393,6 @@ public class TestHiveSyncTool {
     if (syncAsDataSourceTable) {
       assertTrue(ddl.contains("'" + ConfigUtils.IS_QUERY_AS_RO_TABLE + "'='false'"));
     }
-  }
-
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testSyncCOWTableWithCreateManagedTable(boolean createManagedTable) throws Exception {
-    hiveSyncProps.setProperty(HIVE_SYNC_MODE.key(), HiveSyncMode.HMS.name());
-    hiveSyncProps.setProperty(HIVE_CREATE_MANAGED_TABLE.key(), Boolean.toString(createManagedTable));
-
-    String instantTime = "100";
-    HiveTestUtil.createCOWTable(instantTime, 5, true);
-
-    reInitHiveSyncClient();
-    reSyncHiveTable();
-
-    SessionState.start(HiveTestUtil.getHiveConf());
-    Driver hiveDriver = new org.apache.hadoop.hive.ql.Driver(HiveTestUtil.getHiveConf());
-    hiveDriver.run(String.format("SHOW TBLPROPERTIES %s.%s", HiveTestUtil.DB_NAME, HiveTestUtil.TABLE_NAME));
-    List<String> results = new ArrayList<>();
-    hiveDriver.getResults(results);
-
-    assertEquals(
-        String.format("%slast_commit_time_sync\t%s\n%s",
-            createManagedTable ? StringUtils.EMPTY_STRING : "EXTERNAL\tTRUE\n",
-            instantTime,
-            getSparkTableProperties(true, true)),
-        String.format("%s\n", String.join("\n", results.subList(0, results.size() - 1))));
   }
 
   private String getSparkTableProperties(boolean syncAsDataSourceTable, boolean useSchemaFromCommitMetadata) {
@@ -485,7 +457,7 @@ public class TestHiveSyncTool {
     HiveTestUtil.createMORTable(instantTime, deltaCommitTime, 5, true,
         useSchemaFromCommitMetadata);
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
 
     String roTableName = HiveTestUtil.TABLE_NAME + HiveSyncTool.SUFFIX_READ_OPTIMIZED_TABLE;
@@ -543,7 +515,7 @@ public class TestHiveSyncTool {
     String instantTime = "100";
     HiveTestUtil.createCOWTable(instantTime, 5, useSchemaFromCommitMetadata);
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
 
     SessionState.start(HiveTestUtil.getHiveConf());
@@ -571,7 +543,7 @@ public class TestHiveSyncTool {
     String commitTime = "100";
     HiveTestUtil.createCOWTableWithSchema(commitTime, "/complex.schema.avsc");
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
     assertEquals(1, hiveClient.getAllPartitions(HiveTestUtil.TABLE_NAME).size(),
         "Table partitions should match the number of partitions we wrote");
@@ -587,7 +559,7 @@ public class TestHiveSyncTool {
 
     String commitTime1 = "100";
     HiveTestUtil.createCOWTable(commitTime1, 5, true);
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
     assertEquals(5, hiveClient.getAllPartitions(HiveTestUtil.TABLE_NAME).size(),
         "Table partitions should match the number of partitions we wrote");
@@ -624,7 +596,7 @@ public class TestHiveSyncTool {
 
     String commitTime1 = "100";
     HiveTestUtil.createCOWTable(commitTime1, 5, true);
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
 
     int fields = hiveClient.getMetastoreSchema(HiveTestUtil.TABLE_NAME).size();
@@ -635,7 +607,7 @@ public class TestHiveSyncTool {
     HiveTestUtil.addCOWPartitions(1, false, true, dateTime, commitTime2);
 
     // Lets do the sync
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
     assertEquals(fields + 3, hiveClient.getMetastoreSchema(HiveTestUtil.TABLE_NAME).size(),
         "Hive Schema has evolved and should not be 3 more field");
@@ -657,7 +629,7 @@ public class TestHiveSyncTool {
     hiveSyncProps.setProperty(HIVE_SYNC_MODE.key(), syncMode);
     String commitTime = "100";
     HiveTestUtil.createCOWTableWithSchema(commitTime, "/simple-test.avsc");
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
 
     Map<String, Pair<String, String>> alterCommentSchema = new HashMap<>();
@@ -694,7 +666,7 @@ public class TestHiveSyncTool {
     String commitTime = "100";
     HiveTestUtil.createCOWTableWithSchema(commitTime, "/simple-test-doced.avsc");
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
     List<FieldSchema> fieldSchemas = hiveClient.getMetastoreFieldSchemas(HiveTestUtil.TABLE_NAME);
     int commentCnt = 0;
@@ -706,7 +678,7 @@ public class TestHiveSyncTool {
     assertEquals(0, commentCnt, "hive schema field comment numbers should match the avro schema field doc numbers");
 
     hiveSyncProps.setProperty(HIVE_SYNC_COMMENT.key(), "true");
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
     fieldSchemas = hiveClient.getMetastoreFieldSchemas(HiveTestUtil.TABLE_NAME);
     commentCnt = 0;
@@ -730,7 +702,7 @@ public class TestHiveSyncTool {
         useSchemaFromCommitMetadata);
 
     String roTableName = HiveTestUtil.TABLE_NAME + HiveSyncTool.SUFFIX_READ_OPTIMIZED_TABLE;
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     assertFalse(hiveClient.tableExists(roTableName), "Table " + HiveTestUtil.TABLE_NAME + " should not exist initially");
     // Lets do the sync
     reSyncHiveTable();
@@ -763,7 +735,7 @@ public class TestHiveSyncTool {
     HiveTestUtil.addMORPartitions(1, true, false,
         useSchemaFromCommitMetadata, dateTime, commitTime2, deltaCommitTime2);
     // Lets do the sync
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
 
     if (useSchemaFromCommitMetadata) {
@@ -794,7 +766,7 @@ public class TestHiveSyncTool {
     String deltaCommitTime = "101";
     String snapshotTableName = HiveTestUtil.TABLE_NAME + HiveSyncTool.SUFFIX_SNAPSHOT_TABLE;
     HiveTestUtil.createMORTable(instantTime, deltaCommitTime, 5, true, useSchemaFromCommitMetadata);
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     assertFalse(hiveClient.tableExists(snapshotTableName),
         "Table " + HiveTestUtil.TABLE_NAME + HiveSyncTool.SUFFIX_SNAPSHOT_TABLE
             + " should not exist initially");
@@ -831,7 +803,7 @@ public class TestHiveSyncTool {
     HiveTestUtil.addCOWPartitions(1, true, useSchemaFromCommitMetadata, dateTime, commitTime2);
     HiveTestUtil.addMORPartitions(1, true, false, useSchemaFromCommitMetadata, dateTime, commitTime2, deltaCommitTime2);
     // Lets do the sync
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
 
     if (useSchemaFromCommitMetadata) {
@@ -864,7 +836,7 @@ public class TestHiveSyncTool {
 
     String snapshotTableName = HiveTestUtil.TABLE_NAME + HiveSyncTool.SUFFIX_SNAPSHOT_TABLE;
     String roTableName = HiveTestUtil.TABLE_NAME + HiveSyncTool.SUFFIX_READ_OPTIMIZED_TABLE;
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     assertFalse(hiveClient.tableExists(roTableName),
             "Table " + roTableName + " should not exist initially");
     assertFalse(hiveClient.tableExists(snapshotTableName),
@@ -911,7 +883,7 @@ public class TestHiveSyncTool {
 
     HiveTestUtil.getCreatedTablesSet().add(HiveTestUtil.DB_NAME + "." + HiveTestUtil.TABLE_NAME);
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     assertFalse(hiveClient.tableExists(HiveTestUtil.TABLE_NAME),
         "Table " + HiveTestUtil.TABLE_NAME + " should not exist initially");
     // Lets do the sync
@@ -932,7 +904,7 @@ public class TestHiveSyncTool {
     String commitTime2 = "101";
     HiveTestUtil.addCOWPartition("2010/01/02", true, true, commitTime2);
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     List<String> writtenPartitionsSince = hiveClient.getWrittenPartitionsSince(Option.of(instantTime));
     assertEquals(1, writtenPartitionsSince.size(), "We should have one partition written after 100 commit");
     List<org.apache.hudi.sync.common.model.Partition> hivePartitions = hiveClient.getAllPartitions(HiveTestUtil.TABLE_NAME);
@@ -952,7 +924,7 @@ public class TestHiveSyncTool {
     HiveTestUtil.addCOWPartition("2010/02/01", true, true, commitTime3);
     HiveTestUtil.getCreatedTablesSet().add(HiveTestUtil.DB_NAME + "." + HiveTestUtil.TABLE_NAME);
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
     assertTrue(hiveClient.tableExists(HiveTestUtil.TABLE_NAME),
         "Table " + HiveTestUtil.TABLE_NAME + " should exist after sync completes");
@@ -975,7 +947,7 @@ public class TestHiveSyncTool {
     String instantTime = "100";
     HiveTestUtil.createCOWTable(instantTime, 1, true);
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     assertFalse(hiveClient.tableExists(HiveTestUtil.TABLE_NAME),
         "Table " + HiveTestUtil.TABLE_NAME + " should not exist initially");
     // Lets do the sync
@@ -1020,7 +992,7 @@ public class TestHiveSyncTool {
     String instantTime = "100";
     HiveTestUtil.createCOWTable(instantTime, 1, true);
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     assertFalse(hiveClient.tableExists(HiveTestUtil.TABLE_NAME),
         "Table " + HiveTestUtil.TABLE_NAME + " should not exist initially");
     // Lets do the sync
@@ -1054,7 +1026,7 @@ public class TestHiveSyncTool {
     HiveTestUtil.createReplaceCommit(instantTime4, newPartition, WriteOperationType.DELETE_PARTITION, true, true);
 
     // now run hive sync
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
 
     List<Partition> hivePartitions = hiveClient.getAllPartitions(HiveTestUtil.TABLE_NAME);
@@ -1078,7 +1050,7 @@ public class TestHiveSyncTool {
 
     HiveTestUtil.getCreatedTablesSet().add(HiveTestUtil.DB_NAME + "." + HiveTestUtil.TABLE_NAME);
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     assertFalse(hiveClient.tableExists(HiveTestUtil.TABLE_NAME),
         "Table " + HiveTestUtil.TABLE_NAME + " should not exist initially");
     // Lets do the sync
@@ -1101,7 +1073,7 @@ public class TestHiveSyncTool {
     String commitTime = "100";
     String snapshotTableName = HiveTestUtil.TABLE_NAME + HiveSyncTool.SUFFIX_SNAPSHOT_TABLE;
     HiveTestUtil.createMORTable(commitTime, "", 5, false, true);
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
 
     assertFalse(hiveClient.tableExists(snapshotTableName), "Table " + HiveTestUtil.TABLE_NAME + HiveSyncTool.SUFFIX_SNAPSHOT_TABLE
         + " should not exist initially");
@@ -1126,7 +1098,7 @@ public class TestHiveSyncTool {
 
     HiveTestUtil.addMORPartitions(1, true, false, true, dateTime, commitTime2, deltaCommitTime2);
     // Lets do the sync
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
 
     // Schema being read from the log filesTestHiveSyncTool
@@ -1144,7 +1116,7 @@ public class TestHiveSyncTool {
   public void testConnectExceptionIgnoreConfigSet() throws IOException, URISyntaxException {
     String instantTime = "100";
     HiveTestUtil.createCOWTable(instantTime, 5, false);
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     HoodieHiveSyncClient prevHiveClient = hiveClient;
     assertFalse(hiveClient.tableExists(HiveTestUtil.TABLE_NAME),
         "Table " + HiveTestUtil.TABLE_NAME + " should not exist initially");
@@ -1153,7 +1125,7 @@ public class TestHiveSyncTool {
     hiveSyncProps.setProperty(HIVE_IGNORE_EXCEPTIONS.key(), "true");
     hiveSyncProps.setProperty(HIVE_URL.key(), hiveSyncProps.getString(HIVE_URL.key())
         .replace(String.valueOf(HiveTestUtil.hiveTestService.getHiveServerPort()), String.valueOf(NetworkTestUtils.nextFreePort())));
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
 
     assertNull(hiveClient);
@@ -1193,10 +1165,10 @@ public class TestHiveSyncTool {
     // create empty commit
     final String emptyCommitTime = "200";
     HiveTestUtil.createCommitFileWithSchema(commitMetadata, emptyCommitTime, true);
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     assertFalse(hiveClient.tableExists(HiveTestUtil.TABLE_NAME), "Table " + HiveTestUtil.TABLE_NAME + " should not exist initially");
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
 
     verifyOldParquetFileTest(hiveClient, emptyCommitTime);
@@ -1219,7 +1191,7 @@ public class TestHiveSyncTool {
     final String emptyCommitTime = "200";
     HiveTestUtil.createCommitFile(commitMetadata, emptyCommitTime, basePath);
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     assertFalse(
         hiveClient.tableExists(HiveTestUtil.TABLE_NAME), "Table " + HiveTestUtil.TABLE_NAME + " should not exist initially");
 
@@ -1252,7 +1224,7 @@ public class TestHiveSyncTool {
     final String emptyCommitTime = "200";
     HiveTestUtil.createCommitFileWithSchema(commitMetadata, emptyCommitTime, true);
     //HiveTestUtil.createCommitFile(commitMetadata, emptyCommitTime);
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     assertFalse(
         hiveClient.tableExists(HiveTestUtil.TABLE_NAME), "Table " + HiveTestUtil.TABLE_NAME + " should not exist initially");
 
@@ -1267,7 +1239,7 @@ public class TestHiveSyncTool {
     //HiveTestUtil.createCommitFileWithSchema(commitMetadata, "400", false); // create another empty commit
     //HiveTestUtil.createCommitFile(commitMetadata, "400"); // create another empty commit
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     // now delete the evolved commit instant
     Path fullPath = new Path(HiveTestUtil.basePath + "/" + HoodieTableMetaClient.METAFOLDER_NAME + "/"
         + hiveClient.getActiveTimeline().getInstantsAsStream()
@@ -1279,7 +1251,7 @@ public class TestHiveSyncTool {
     } catch (RuntimeException e) {
       // we expect the table sync to fail
     } finally {
-      reInitHiveSyncClient();
+      reinitHiveSyncClient();
     }
 
     // old sync values should be left intact
@@ -1293,7 +1265,7 @@ public class TestHiveSyncTool {
     HiveTestUtil.createCOWTable("100", 5, true);
     // create database.
     ddlExecutor.runSQL("create database " + HiveTestUtil.DB_NAME);
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     String tableName = HiveTestUtil.TABLE_NAME;
     String tableAbsoluteName = String.format(" `%s.%s` ", HiveTestUtil.DB_NAME, tableName);
     String dropTableSql = String.format("DROP TABLE IF EXISTS %s ", tableAbsoluteName);
@@ -1338,7 +1310,7 @@ public class TestHiveSyncTool {
     String commitTime2 = "102";
     HiveTestUtil.createMORTable(commitTime0, commitTime1, 2, true, true);
 
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
     reSyncHiveTable();
 
     assertTrue(hiveClient.tableExists(tableName));
@@ -1352,12 +1324,12 @@ public class TestHiveSyncTool {
 
   private void reSyncHiveTable() {
     hiveSyncTool.syncHoodieTable();
-    // we need renew the hive client after tool.syncHoodieTable(), because it will close hive
+    // we need renew the hiveclient after tool.syncHoodieTable(), because it will close hive
     // session, then lead to connection retry, we can see there is a exception at log.
-    reInitHiveSyncClient();
+    reinitHiveSyncClient();
   }
 
-  private void reInitHiveSyncClient() {
+  private void reinitHiveSyncClient() {
     hiveSyncTool = new HiveSyncTool(hiveSyncProps, HiveTestUtil.getHiveConf());
     hiveClient = (HoodieHiveSyncClient) hiveSyncTool.syncClient;
   }

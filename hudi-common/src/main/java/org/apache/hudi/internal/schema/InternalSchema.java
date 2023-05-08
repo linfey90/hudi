@@ -23,7 +23,7 @@ import org.apache.hudi.internal.schema.Types.Field;
 import org.apache.hudi.internal.schema.Types.RecordType;
 
 import java.io.Serializable;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -118,7 +118,7 @@ public class InternalSchema implements Serializable {
     if (nameToId == null) {
       nameToId = InternalSchemaBuilder.getBuilder().buildNameToId(record);
     }
-    return new ArrayList<>(nameToId.keySet());
+    return Arrays.asList(nameToId.keySet().toArray(new String[0]));
   }
 
   /**
@@ -241,24 +241,15 @@ public class InternalSchema implements Serializable {
   }
 
   /**
-   * Whether {@code colName} exists in the current Schema
+   * Whether colName exists in current Schema.
+   * Case insensitive.
    *
-   * @param colName a column name
-   * @param caseSensitive whether columns names should be treated as case-sensitive
-   * @return whether schema contains column identified by {@code colName}
+   * @param colName a colName
+   * @return Whether colName exists in current Schema
    */
-  public boolean hasColumn(String colName, boolean caseSensitive) {
-    if (caseSensitive) {
-      // In case we do a case-sensitive check we just need to validate whether
-      // schema contains field-name as it is
-      return idToName.containsValue(colName);
-    } else {
-      return idToName.values()
-          .stream()
-          .map(fieldName -> fieldName.toLowerCase(Locale.ROOT))
-          .collect(Collectors.toSet())
-          .contains(colName.toLowerCase(Locale.ROOT));
-    }
+  public boolean findDuplicateCol(String colName) {
+    return idToName.entrySet().stream().map(e -> e.getValue().toLowerCase(Locale.ROOT))
+        .collect(Collectors.toSet()).contains(colName);
   }
 
   public int findIdByName(String name) {

@@ -216,7 +216,7 @@ public class InternalSchemaManager implements Serializable {
 
   private org.apache.hadoop.conf.Configuration getHadoopConf() {
     if (hadoopConf == null) {
-      hadoopConf = HadoopConfigurations.getAllHadoopConf(conf);
+      hadoopConf = HadoopConfigurations.getHadoopConf(conf);
     }
     return hadoopConf;
   }

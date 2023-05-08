@@ -25,11 +25,11 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Wrapper for DataOutputStream to keep track of number of bytes written.
+ * Wrapper for DataOutpuStream to keep track of number of bytes written.
  */
 public class SizeAwareDataOutputStream {
 
-  // Actual outputStream
+  // Actual outpuStream
   private DataOutputStream outputStream;
   // Counter to keep track of number of bytes written
   private AtomicLong size;

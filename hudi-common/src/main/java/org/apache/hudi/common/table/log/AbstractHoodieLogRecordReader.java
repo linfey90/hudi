@@ -33,7 +33,8 @@ import org.apache.hudi.common.table.log.block.HoodieDataBlock;
 import org.apache.hudi.common.table.log.block.HoodieDeleteBlock;
 import org.apache.hudi.common.table.log.block.HoodieLogBlock;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
-import org.apache.hudi.common.util.collection.ClosableIterator;
+import org.apache.hudi.common.util.ClosableIterator;
+import org.apache.hudi.common.util.ClosableIteratorWithSchema;
 import org.apache.hudi.common.util.InternalSchemaCache;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.CloseableMappingIterator;
@@ -626,13 +627,10 @@ public abstract class AbstractHoodieLogRecordReader {
         ? Option.empty()
         : Option.of(Pair.of(recordKeyField, partitionPathFieldOpt.orElse(null)));
 
-    Pair<ClosableIterator<HoodieRecord>, Schema> recordsIteratorSchemaPair =
-        getRecordsIterator(dataBlock, keySpecOpt);
-
-    try (ClosableIterator<HoodieRecord> recordIterator = recordsIteratorSchemaPair.getLeft()) {
+    try (ClosableIteratorWithSchema<HoodieRecord> recordIterator = getRecordsIterator(dataBlock, keySpecOpt)) {
       while (recordIterator.hasNext()) {
         HoodieRecord completedRecord = recordIterator.next()
-            .wrapIntoHoodieRecordPayloadWithParams(recordsIteratorSchemaPair.getRight(),
+            .wrapIntoHoodieRecordPayloadWithParams(recordIterator.getSchema(),
                 hoodieTableMetaClient.getTableConfig().getProps(),
                 recordKeyPartitionPathFieldPair,
                 this.withOperationField,
@@ -796,7 +794,7 @@ public abstract class AbstractHoodieLogRecordReader {
     return validBlockInstants;
   }
 
-  private Pair<ClosableIterator<HoodieRecord>, Schema> getRecordsIterator(
+  private ClosableIteratorWithSchema<HoodieRecord> getRecordsIterator(
       HoodieDataBlock dataBlock, Option<KeySpec> keySpecOpt) throws IOException {
     ClosableIterator<HoodieRecord> blockRecordsIterator;
     if (keySpecOpt.isPresent()) {
@@ -809,17 +807,16 @@ public abstract class AbstractHoodieLogRecordReader {
 
     Option<Pair<Function<HoodieRecord, HoodieRecord>, Schema>> schemaEvolutionTransformerOpt =
         composeEvolvedSchemaTransformer(dataBlock);
-
     // In case when schema has been evolved original persisted records will have to be
     // transformed to adhere to the new schema
-    Function<HoodieRecord, HoodieRecord> transformer =
-        schemaEvolutionTransformerOpt.map(Pair::getLeft)
-            .orElse(Function.identity());
-
-    Schema schema = schemaEvolutionTransformerOpt.map(Pair::getRight)
-        .orElse(dataBlock.getSchema());
-
-    return Pair.of(new CloseableMappingIterator<>(blockRecordsIterator, transformer), schema);
+    if (schemaEvolutionTransformerOpt.isPresent()) {
+      return ClosableIteratorWithSchema.newInstance(
+          new CloseableMappingIterator<>(blockRecordsIterator,
+              schemaEvolutionTransformerOpt.get().getLeft()),
+          schemaEvolutionTransformerOpt.get().getRight());
+    } else {
+      return ClosableIteratorWithSchema.newInstance(blockRecordsIterator, dataBlock.getSchema());
+    }
   }
 
   /**

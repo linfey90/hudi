@@ -97,12 +97,9 @@ public class UpsertPartitioner<T> extends SparkHoodiePartitioner<T> {
     assignUpdates(profile);
     assignInserts(profile, context);
 
-    LOG.info("Total Buckets: " + totalBuckets);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Buckets info => " + bucketInfoMap + ", \n"
-              + "Partition to insert buckets => " + partitionPathToInsertBucketInfos + ", \n"
-              + "UpdateLocations mapped to buckets =>" + updateLocationToBucket);
-    }
+    LOG.info("Total Buckets :" + totalBuckets + ", buckets info => " + bucketInfoMap + ", \n"
+        + "Partition to insert buckets => " + partitionPathToInsertBucketInfos + ", \n"
+        + "UpdateLocations mapped to buckets =>" + updateLocationToBucket);
   }
 
   private void assignUpdates(WorkloadProfile profile) {
@@ -189,7 +186,7 @@ public class UpsertPartitioner<T> extends SparkHoodiePartitioner<T> {
 
         this.smallFiles.addAll(smallFiles);
 
-        LOG.debug("For partitionPath : " + partitionPath + " Small Files => " + smallFiles);
+        LOG.info("For partitionPath : " + partitionPath + " Small Files => " + smallFiles);
 
         long totalUnassignedInserts = pStat.getNumInserts();
         List<Integer> bucketNumbers = new ArrayList<>();
@@ -204,10 +201,10 @@ public class UpsertPartitioner<T> extends SparkHoodiePartitioner<T> {
             int bucket;
             if (updateLocationToBucket.containsKey(smallFile.location.getFileId())) {
               bucket = updateLocationToBucket.get(smallFile.location.getFileId());
-              LOG.debug("Assigning " + recordsToAppend + " inserts to existing update bucket " + bucket);
+              LOG.info("Assigning " + recordsToAppend + " inserts to existing update bucket " + bucket);
             } else {
               bucket = addUpdateBucket(partitionPath, smallFile.location.getFileId());
-              LOG.debug("Assigning " + recordsToAppend + " inserts to new update bucket " + bucket);
+              LOG.info("Assigning " + recordsToAppend + " inserts to new update bucket " + bucket);
             }
             if (profile.hasOutputWorkLoadStats()) {
               outputWorkloadStats.addInserts(smallFile.location, recordsToAppend);
@@ -230,7 +227,7 @@ public class UpsertPartitioner<T> extends SparkHoodiePartitioner<T> {
           }
 
           int insertBuckets = (int) Math.ceil((1.0 * totalUnassignedInserts) / insertRecordsPerBucket);
-          LOG.debug("After small file assignment: unassignedInserts => " + totalUnassignedInserts
+          LOG.info("After small file assignment: unassignedInserts => " + totalUnassignedInserts
               + ", totalInsertBuckets => " + insertBuckets + ", recordsPerBucket => " + insertRecordsPerBucket);
           for (int b = 0; b < insertBuckets; b++) {
             bucketNumbers.add(totalBuckets);
@@ -258,7 +255,7 @@ public class UpsertPartitioner<T> extends SparkHoodiePartitioner<T> {
           currentCumulativeWeight += bkt.weight;
           insertBuckets.add(new InsertBucketCumulativeWeightPair(bkt, currentCumulativeWeight));
         }
-        LOG.debug("Total insert buckets for partition path " + partitionPath + " => " + insertBuckets);
+        LOG.info("Total insert buckets for partition path " + partitionPath + " => " + insertBuckets);
         partitionPathToInsertBucketInfos.put(partitionPath, insertBuckets);
       }
       if (profile.hasOutputWorkLoadStats()) {

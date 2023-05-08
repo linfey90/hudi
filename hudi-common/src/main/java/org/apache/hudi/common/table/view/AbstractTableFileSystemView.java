@@ -95,8 +95,8 @@ public abstract class AbstractTableFileSystemView implements SyncableFileSystemV
   // Locks to control concurrency. Sync operations use write-lock blocking all fetch operations.
   // For the common-case, we allow concurrent read of single or multiple partitions
   private final ReentrantReadWriteLock globalLock = new ReentrantReadWriteLock();
-  protected final ReadLock readLock = globalLock.readLock();
-  protected final WriteLock writeLock = globalLock.writeLock();
+  private final ReadLock readLock = globalLock.readLock();
+  private final WriteLock writeLock = globalLock.writeLock();
 
   private BootstrapIndex bootstrapIndex;
 
@@ -157,7 +157,7 @@ public abstract class AbstractTableFileSystemView implements SyncableFileSystemV
       }
     });
     long storePartitionsTs = timer.endTimer();
-    LOG.debug("addFilesToView: NumFiles=" + statuses.length + ", NumFileGroups=" + fileGroups.size()
+    LOG.info("addFilesToView: NumFiles=" + statuses.length + ", NumFileGroups=" + fileGroups.size()
         + ", FileGroupsCreationTime=" + fgBuildTimeTakenMs
         + ", StoreTimeTaken=" + storePartitionsTs);
     return fileGroups;
@@ -247,9 +247,7 @@ public abstract class AbstractTableFileSystemView implements SyncableFileSystemV
       }
     });
 
-    // Duplicate key error when insert_overwrite same partition in multi writer, keep the instant with greater timestamp when the file group id conflicts
-    Map<HoodieFileGroupId, HoodieInstant> replacedFileGroups = resultStream.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue,
-        (instance1, instance2) -> HoodieTimeline.compareTimestamps(instance1.getTimestamp(), HoodieTimeline.LESSER_THAN, instance2.getTimestamp()) ? instance2 : instance1));
+    Map<HoodieFileGroupId, HoodieInstant> replacedFileGroups = resultStream.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     resetReplacedFileGroups(replacedFileGroups);
     LOG.info("Took " + hoodieTimer.endTimer() + " ms to read  " + replacedTimeline.countInstants() + " instants, "
         + replacedFileGroups.size() + " replaced file groups");
@@ -259,8 +257,6 @@ public abstract class AbstractTableFileSystemView implements SyncableFileSystemV
   public void close() {
     try {
       writeLock.lock();
-      this.metaClient = null;
-      this.visibleCommitsAndCompactionTimeline = null;
       clear();
     } finally {
       writeLock.unlock();
@@ -269,8 +265,6 @@ public abstract class AbstractTableFileSystemView implements SyncableFileSystemV
 
   /**
    * Clears the partition Map and reset view states.
-   * <p>
-   * NOTE: The logic MUST BE guarded by the write lock.
    */
   @Override
   public void reset() {
@@ -287,7 +281,7 @@ public abstract class AbstractTableFileSystemView implements SyncableFileSystemV
   /**
    * Clear the resource.
    */
-  protected void clear() {
+  private void clear() {
     addedPartitions.clear();
     resetViewState();
     bootstrapIndex = null;
@@ -1390,23 +1384,30 @@ public abstract class AbstractTableFileSystemView implements SyncableFileSystemV
     return visibleCommitsAndCompactionTimeline;
   }
 
-  /**
-   * Syncs the file system view from storage to memory.  Performs complete reset of file-system
-   * view. Subsequent partition view calls will load file slices against the latest timeline.
-   * <p>
-   * NOTE: The logic MUST BE guarded by the write lock.
-   */
   @Override
   public void sync() {
+    HoodieTimeline oldTimeline = getTimeline();
+    HoodieTimeline newTimeline = metaClient.reloadActiveTimeline().filterCompletedOrMajorOrMinorCompactionInstants();
     try {
       writeLock.lock();
-      HoodieTimeline newTimeline = metaClient.reloadActiveTimeline().filterCompletedOrMajorOrMinorCompactionInstants();
-      clear();
-      // Initialize with new Hoodie timeline.
-      init(metaClient, newTimeline);
+      runSync(oldTimeline, newTimeline);
     } finally {
       writeLock.unlock();
     }
+  }
+
+  /**
+   * Performs complete reset of file-system view. Subsequent partition view calls will load file slices against latest
+   * timeline
+   *
+   * @param oldTimeline Old Hoodie Timeline
+   * @param newTimeline New Hoodie Timeline
+   */
+  protected void runSync(HoodieTimeline oldTimeline, HoodieTimeline newTimeline) {
+    refreshTimeline(newTimeline);
+    clear();
+    // Initialize with new Hoodie timeline.
+    init(metaClient, newTimeline);
   }
 
   /**

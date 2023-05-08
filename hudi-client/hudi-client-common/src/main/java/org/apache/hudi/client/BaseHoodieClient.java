@@ -170,8 +170,7 @@ public abstract class BaseHoodieClient implements Serializable, AutoCloseable {
    *
    * @param table A hoodie table instance created after transaction starts so that the latest commits and files are captured.
    * @param metadata Current committing instant's metadata
-   * @param pendingInflightAndRequestedInstants Pending instants on the timeline
-   *
+   * @param pendingInflightAndRequestedInstants
    * @see {@link BaseHoodieWriteClient#preCommit}
    * @see {@link BaseHoodieTableServiceClient#preCommit}
    */

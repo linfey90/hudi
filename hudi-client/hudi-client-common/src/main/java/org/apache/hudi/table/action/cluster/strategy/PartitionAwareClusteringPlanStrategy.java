@@ -76,7 +76,6 @@ public abstract class PartitionAwareClusteringPlanStrategy<T,I,K,O> extends Clus
     HoodieWriteConfig config = getWriteConfig();
 
     String partitionSelected = config.getClusteringPartitionSelected();
-    LOG.info("Scheduling clustering partitionSelected: " + partitionSelected);
     List<String> partitionPaths;
 
     if (StringUtils.isNullOrEmpty(partitionSelected)) {
@@ -88,7 +87,6 @@ public abstract class PartitionAwareClusteringPlanStrategy<T,I,K,O> extends Clus
     }
 
     partitionPaths = filterPartitionPaths(partitionPaths);
-    LOG.info("Scheduling clustering partitionPaths: " + partitionPaths);
 
     if (partitionPaths.isEmpty()) {
       // In case no partitions could be picked, return no clustering plan

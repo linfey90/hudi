@@ -26,8 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.UUID;
-
+import static org.apache.hudi.metrics.Metrics.registerGauge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
@@ -39,12 +38,10 @@ public class TestHoodieGraphiteMetrics {
 
   @Mock
   HoodieWriteConfig config;
-  HoodieMetrics hoodieMetrics;
-  Metrics metrics;
 
   @AfterEach
   void shutdownMetrics() {
-    metrics.shutdown();
+    Metrics.shutdown();
   }
 
   @Test
@@ -55,11 +52,9 @@ public class TestHoodieGraphiteMetrics {
     when(config.getGraphiteServerHost()).thenReturn("localhost");
     when(config.getGraphiteServerPort()).thenReturn(NetworkTestUtils.nextFreePort());
     when(config.getGraphiteReportPeriodSeconds()).thenReturn(30);
-    when(config.getBasePath()).thenReturn("s3://test" + UUID.randomUUID());
-    hoodieMetrics = new HoodieMetrics(config);
-    metrics = hoodieMetrics.getMetrics();
-    metrics.registerGauge("graphite_metric", 123L);
-    assertEquals("123", metrics.getRegistry().getGauges()
+    new HoodieMetrics(config);
+    registerGauge("graphite_metric", 123L);
+    assertEquals("123", Metrics.getInstance().getRegistry().getGauges()
                             .get("graphite_metric").getValue().toString());
   }
 }

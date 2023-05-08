@@ -40,6 +40,7 @@ import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.table.action.HoodieWriteMetadata;
 import org.apache.hudi.table.action.compact.CompactHelpers;
 import org.apache.hudi.table.marker.WriteMarkersFactory;
+import org.apache.hudi.util.FlinkClientUtil;
 
 import org.apache.hadoop.conf.Configuration;
 import org.slf4j.Logger;
@@ -181,21 +182,13 @@ public class HoodieFlinkTableServiceClient<T> extends BaseHoodieTableServiceClie
     }
   }
 
-  @Override
-  protected void preCommit(HoodieCommitMetadata metadata) {
-    // Create a Hoodie table after startTxn which encapsulated the commits and files visible.
-    // Important to create this after the lock to ensure the latest commits show up in the timeline without need for reload
-    HoodieTable table = createTable(config, hadoopConf);
-    resolveWriteConflict(table, metadata, this.pendingInflightAndRequestedInstants);
-  }
-
   /**
    * Initialize the table metadata writer, for e.g, bootstrap the metadata table
    * from the filesystem if it does not exist.
    */
   private HoodieBackedTableMetadataWriter initMetadataWriter() {
     return (HoodieBackedTableMetadataWriter) FlinkHoodieBackedTableMetadataWriter.create(
-        this.hadoopConf, this.config, new HoodieFlinkEngineContext(this.hadoopConf));
+        FlinkClientUtil.getHadoopConf(), this.config, HoodieFlinkEngineContext.DEFAULT);
   }
 
   public void initMetadataTable() {

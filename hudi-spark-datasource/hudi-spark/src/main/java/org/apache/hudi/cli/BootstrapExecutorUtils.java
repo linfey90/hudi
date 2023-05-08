@@ -199,9 +199,7 @@ public class BootstrapExecutorUtils implements Serializable {
             props.getInteger(BUCKET_INDEX_NUM_BUCKETS.key())));
       }
 
-      try (HiveSyncTool hiveSyncTool = new HiveSyncTool(metaProps, configuration)) {
-        hiveSyncTool.syncHoodieTable();
-      }
+      new HiveSyncTool(metaProps, configuration).syncHoodieTable();
     }
   }
 

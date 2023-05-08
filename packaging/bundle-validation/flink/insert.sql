@@ -28,7 +28,6 @@ CREATE TABLE t1
 WITH (
   'connector' = 'hudi',
   'table.type' = 'MERGE_ON_READ',
-  'metadata.enabled' = 'false', -- avoid classloader issue, class HFile can not be found
   'path' = '/tmp/hudi-flink-bundle-test'
 );
 

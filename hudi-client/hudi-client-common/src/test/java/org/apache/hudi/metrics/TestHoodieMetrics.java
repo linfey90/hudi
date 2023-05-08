@@ -32,9 +32,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Random;
-import java.util.UUID;
 import java.util.stream.Stream;
 
+import static org.apache.hudi.metrics.Metrics.registerGauge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -45,28 +45,25 @@ public class TestHoodieMetrics {
 
   @Mock
   HoodieWriteConfig config;
-  HoodieMetrics hoodieMetrics;
-  Metrics metrics;
+  HoodieMetrics metrics;
 
   @BeforeEach
   void setUp() {
     when(config.isMetricsOn()).thenReturn(true);
     when(config.getTableName()).thenReturn("raw_table");
     when(config.getMetricsReporterType()).thenReturn(MetricsReporterType.INMEMORY);
-    when(config.getBasePath()).thenReturn("s3://test" + UUID.randomUUID());
-    hoodieMetrics = new HoodieMetrics(config);
-    metrics = hoodieMetrics.getMetrics();
+    metrics = new HoodieMetrics(config);
   }
 
   @AfterEach
   void shutdownMetrics() {
-    metrics.shutdown();
+    Metrics.shutdown();
   }
 
   @Test
   public void testRegisterGauge() {
-    metrics.registerGauge("metric1", 123L);
-    assertEquals("123", metrics.getRegistry().getGauges().get("metric1").getValue().toString());
+    registerGauge("metric1", 123L);
+    assertEquals("123", Metrics.getInstance().getRegistry().getGauges().get("metric1").getValue().toString());
   }
 
   @Test
@@ -74,50 +71,50 @@ public class TestHoodieMetrics {
     Random rand = new Random();
 
     // Index metrics
-    Timer.Context timer = hoodieMetrics.getIndexCtx();
+    Timer.Context timer = metrics.getIndexCtx();
     Thread.sleep(5); // Ensure timer duration is > 0
-    hoodieMetrics.updateIndexMetrics("some_action", hoodieMetrics.getDurationInMs(timer.stop()));
-    String metricName = hoodieMetrics.getMetricsName("index", "some_action.duration");
-    long msec = (Long)metrics.getRegistry().getGauges().get(metricName).getValue();
+    metrics.updateIndexMetrics("some_action", metrics.getDurationInMs(timer.stop()));
+    String metricName = metrics.getMetricsName("index", "some_action.duration");
+    long msec = (Long)Metrics.getInstance().getRegistry().getGauges().get(metricName).getValue();
     assertTrue(msec > 0);
 
     // Rollback metrics
-    timer = hoodieMetrics.getRollbackCtx();
+    timer = metrics.getRollbackCtx();
     Thread.sleep(5); // Ensure timer duration is > 0
     long numFilesDeleted = 1 + rand.nextInt();
-    hoodieMetrics.updateRollbackMetrics(hoodieMetrics.getDurationInMs(timer.stop()), numFilesDeleted);
-    metricName = hoodieMetrics.getMetricsName("rollback", "duration");
-    msec = (Long)metrics.getRegistry().getGauges().get(metricName).getValue();
+    metrics.updateRollbackMetrics(metrics.getDurationInMs(timer.stop()), numFilesDeleted);
+    metricName = metrics.getMetricsName("rollback", "duration");
+    msec = (Long)Metrics.getInstance().getRegistry().getGauges().get(metricName).getValue();
     assertTrue(msec > 0);
-    metricName = hoodieMetrics.getMetricsName("rollback", "numFilesDeleted");
-    assertEquals((long)metrics.getRegistry().getGauges().get(metricName).getValue(), numFilesDeleted);
+    metricName = metrics.getMetricsName("rollback", "numFilesDeleted");
+    assertEquals((long)Metrics.getInstance().getRegistry().getGauges().get(metricName).getValue(), numFilesDeleted);
 
     // Clean metrics
-    timer = hoodieMetrics.getRollbackCtx();
+    timer = metrics.getRollbackCtx();
     Thread.sleep(5); // Ensure timer duration is > 0
     numFilesDeleted = 1 + rand.nextInt();
-    hoodieMetrics.updateCleanMetrics(hoodieMetrics.getDurationInMs(timer.stop()), (int)numFilesDeleted);
-    metricName = hoodieMetrics.getMetricsName("clean", "duration");
-    msec = (Long)metrics.getRegistry().getGauges().get(metricName).getValue();
+    metrics.updateCleanMetrics(metrics.getDurationInMs(timer.stop()), (int)numFilesDeleted);
+    metricName = metrics.getMetricsName("clean", "duration");
+    msec = (Long)Metrics.getInstance().getRegistry().getGauges().get(metricName).getValue();
     assertTrue(msec > 0);
-    metricName = hoodieMetrics.getMetricsName("clean", "numFilesDeleted");
-    assertEquals((long)metrics.getRegistry().getGauges().get(metricName).getValue(), numFilesDeleted);
+    metricName = metrics.getMetricsName("clean", "numFilesDeleted");
+    assertEquals((long)Metrics.getInstance().getRegistry().getGauges().get(metricName).getValue(), numFilesDeleted);
 
     // Finalize metrics
-    timer = hoodieMetrics.getFinalizeCtx();
+    timer = metrics.getFinalizeCtx();
     Thread.sleep(5); // Ensure timer duration is > 0
     long numFilesFinalized = 1 + rand.nextInt();
-    hoodieMetrics.updateFinalizeWriteMetrics(hoodieMetrics.getDurationInMs(timer.stop()), (int)numFilesFinalized);
-    metricName = hoodieMetrics.getMetricsName("finalize", "duration");
-    msec = (Long)metrics.getRegistry().getGauges().get(metricName).getValue();
+    metrics.updateFinalizeWriteMetrics(metrics.getDurationInMs(timer.stop()), (int)numFilesFinalized);
+    metricName = metrics.getMetricsName("finalize", "duration");
+    msec = (Long)Metrics.getInstance().getRegistry().getGauges().get(metricName).getValue();
     assertTrue(msec > 0);
-    metricName = hoodieMetrics.getMetricsName("finalize", "numFilesFinalized");
-    assertEquals((long)metrics.getRegistry().getGauges().get(metricName).getValue(), numFilesFinalized);
+    metricName = metrics.getMetricsName("finalize", "numFilesFinalized");
+    assertEquals((long)Metrics.getInstance().getRegistry().getGauges().get(metricName).getValue(), numFilesFinalized);
 
     // Commit / deltacommit / compaction metrics
     Stream.of("commit", "deltacommit", "compaction").forEach(action -> {
-      Timer.Context commitTimer = action.equals("commit") ? hoodieMetrics.getCommitCtx() :
-          action.equals("deltacommit") ? hoodieMetrics.getDeltaCommitCtx() : hoodieMetrics.getCompactionCtx();
+      Timer.Context commitTimer = action.equals("commit") ? metrics.getCommitCtx() :
+          action.equals("deltacommit") ? metrics.getDeltaCommitCtx() : metrics.getCompactionCtx();
 
       try {
         // Ensure timer duration is > 0
@@ -142,41 +139,41 @@ public class TestHoodieMetrics {
       when(metadata.getTotalLogFilesSize()).thenReturn(randomValue + 13);
       when(metadata.getTotalRecordsDeleted()).thenReturn(randomValue + 14);
       when(metadata.getMinAndMaxEventTime()).thenReturn(Pair.of(Option.empty(), Option.empty()));
-      hoodieMetrics.updateCommitMetrics(randomValue + 15, commitTimer.stop(), metadata, action);
+      metrics.updateCommitMetrics(randomValue + 15, commitTimer.stop(), metadata, action);
 
-      String metricname = hoodieMetrics.getMetricsName(action, "duration");
-      long duration = (Long)metrics.getRegistry().getGauges().get(metricname).getValue();
+      String metricname = metrics.getMetricsName(action, "duration");
+      long duration = (Long)Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue();
       assertTrue(duration > 0);
-      metricname = hoodieMetrics.getMetricsName(action, "totalPartitionsWritten");
-      assertEquals((long)metrics.getRegistry().getGauges().get(metricname).getValue(), metadata.fetchTotalPartitionsWritten());
-      metricname = hoodieMetrics.getMetricsName(action, "totalFilesInsert");
-      assertEquals((long)metrics.getRegistry().getGauges().get(metricname).getValue(), metadata.fetchTotalFilesInsert());
-      metricname = hoodieMetrics.getMetricsName(action, "totalFilesUpdate");
-      assertEquals((long)metrics.getRegistry().getGauges().get(metricname).getValue(), metadata.fetchTotalFilesUpdated());
-      metricname = hoodieMetrics.getMetricsName(action, "totalRecordsWritten");
-      assertEquals((long)metrics.getRegistry().getGauges().get(metricname).getValue(), metadata.fetchTotalRecordsWritten());
-      metricname = hoodieMetrics.getMetricsName(action, "totalUpdateRecordsWritten");
-      assertEquals((long)metrics.getRegistry().getGauges().get(metricname).getValue(), metadata.fetchTotalUpdateRecordsWritten());
-      metricname = hoodieMetrics.getMetricsName(action, "totalInsertRecordsWritten");
-      assertEquals((long)metrics.getRegistry().getGauges().get(metricname).getValue(), metadata.fetchTotalInsertRecordsWritten());
-      metricname = hoodieMetrics.getMetricsName(action, "totalBytesWritten");
-      assertEquals((long)metrics.getRegistry().getGauges().get(metricname).getValue(), metadata.fetchTotalBytesWritten());
-      metricname = hoodieMetrics.getMetricsName(action, "commitTime");
-      assertEquals((long)metrics.getRegistry().getGauges().get(metricname).getValue(), randomValue + 15);
-      metricname = hoodieMetrics.getMetricsName(action, "totalScanTime");
-      assertEquals(metrics.getRegistry().getGauges().get(metricname).getValue(), metadata.getTotalScanTime());
-      metricname = hoodieMetrics.getMetricsName(action, "totalCreateTime");
-      assertEquals(metrics.getRegistry().getGauges().get(metricname).getValue(), metadata.getTotalCreateTime());
-      metricname = hoodieMetrics.getMetricsName(action, "totalUpsertTime");
-      assertEquals(metrics.getRegistry().getGauges().get(metricname).getValue(), metadata.getTotalUpsertTime());
-      metricname = hoodieMetrics.getMetricsName(action, "totalCompactedRecordsUpdated");
-      assertEquals(metrics.getRegistry().getGauges().get(metricname).getValue(), metadata.getTotalCompactedRecordsUpdated());
-      metricname = hoodieMetrics.getMetricsName(action, "totalLogFilesCompacted");
-      assertEquals(metrics.getRegistry().getGauges().get(metricname).getValue(), metadata.getTotalLogFilesCompacted());
-      metricname = hoodieMetrics.getMetricsName(action, "totalLogFilesSize");
-      assertEquals(metrics.getRegistry().getGauges().get(metricname).getValue(), metadata.getTotalLogFilesSize());
-      metricname = hoodieMetrics.getMetricsName(action, "totalRecordsDeleted");
-      assertEquals(metrics.getRegistry().getGauges().get(metricname).getValue(), metadata.getTotalRecordsDeleted());
+      metricname = metrics.getMetricsName(action, "totalPartitionsWritten");
+      assertEquals((long)Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue(), metadata.fetchTotalPartitionsWritten());
+      metricname = metrics.getMetricsName(action, "totalFilesInsert");
+      assertEquals((long)Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue(), metadata.fetchTotalFilesInsert());
+      metricname = metrics.getMetricsName(action, "totalFilesUpdate");
+      assertEquals((long)Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue(), metadata.fetchTotalFilesUpdated());
+      metricname = metrics.getMetricsName(action, "totalRecordsWritten");
+      assertEquals((long)Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue(), metadata.fetchTotalRecordsWritten());
+      metricname = metrics.getMetricsName(action, "totalUpdateRecordsWritten");
+      assertEquals((long)Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue(), metadata.fetchTotalUpdateRecordsWritten());
+      metricname = metrics.getMetricsName(action, "totalInsertRecordsWritten");
+      assertEquals((long)Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue(), metadata.fetchTotalInsertRecordsWritten());
+      metricname = metrics.getMetricsName(action, "totalBytesWritten");
+      assertEquals((long)Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue(), metadata.fetchTotalBytesWritten());
+      metricname = metrics.getMetricsName(action, "commitTime");
+      assertEquals((long)Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue(), randomValue + 15);
+      metricname = metrics.getMetricsName(action, "totalScanTime");
+      assertEquals(Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue(), metadata.getTotalScanTime());
+      metricname = metrics.getMetricsName(action, "totalCreateTime");
+      assertEquals(Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue(), metadata.getTotalCreateTime());
+      metricname = metrics.getMetricsName(action, "totalUpsertTime");
+      assertEquals(Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue(), metadata.getTotalUpsertTime());
+      metricname = metrics.getMetricsName(action, "totalCompactedRecordsUpdated");
+      assertEquals(Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue(), metadata.getTotalCompactedRecordsUpdated());
+      metricname = metrics.getMetricsName(action, "totalLogFilesCompacted");
+      assertEquals(Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue(), metadata.getTotalLogFilesCompacted());
+      metricname = metrics.getMetricsName(action, "totalLogFilesSize");
+      assertEquals(Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue(), metadata.getTotalLogFilesSize());
+      metricname = metrics.getMetricsName(action, "totalRecordsDeleted");
+      assertEquals(Metrics.getInstance().getRegistry().getGauges().get(metricname).getValue(), metadata.getTotalRecordsDeleted());
     });
   }
 }

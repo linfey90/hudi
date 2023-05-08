@@ -20,8 +20,6 @@ package org.apache.hudi.util;
 
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
-import org.apache.hudi.common.util.StringUtils;
-import org.apache.hudi.configuration.FlinkOptions;
 import org.apache.hudi.configuration.HadoopConfigurations;
 import org.apache.hudi.exception.HoodieIOException;
 
@@ -45,9 +43,7 @@ import static org.apache.hudi.common.table.HoodieTableMetaClient.AUXILIARYFOLDER
 public class ViewStorageProperties {
   private static final Logger LOG = LoggerFactory.getLogger(ViewStorageProperties.class);
 
-  private static final String FILE_NAME = "view_storage_conf";
-
-  private static final String FILE_SUFFIX = ".properties";
+  private static final String FILE_NAME = "view_storage_conf.properties";
 
   /**
    * Initialize the {@link #FILE_NAME} meta file.
@@ -56,8 +52,8 @@ public class ViewStorageProperties {
       String basePath,
       FileSystemViewStorageConfig config,
       Configuration flinkConf) throws IOException {
-    Path propertyPath = getPropertiesFilePath(basePath, flinkConf.getString(FlinkOptions.WRITE_CLIENT_ID));
-    FileSystem fs = FSUtils.getFs(basePath, HadoopConfigurations.getAllHadoopConf(flinkConf));
+    Path propertyPath = getPropertiesFilePath(basePath);
+    FileSystem fs = FSUtils.getFs(basePath, HadoopConfigurations.getHadoopConf(flinkConf));
     fs.delete(propertyPath, false);
     try (FSDataOutputStream outputStream = fs.create(propertyPath)) {
       config.getProps().store(outputStream,
@@ -69,9 +65,9 @@ public class ViewStorageProperties {
    * Read the {@link FileSystemViewStorageConfig} with given table base path.
    */
   public static FileSystemViewStorageConfig loadFromProperties(String basePath, Configuration conf) {
-    Path propertyPath = getPropertiesFilePath(basePath, conf.getString(FlinkOptions.WRITE_CLIENT_ID));
+    Path propertyPath = getPropertiesFilePath(basePath);
     LOG.info("Loading filesystem view storage properties from " + propertyPath);
-    FileSystem fs = FSUtils.getFs(basePath, HadoopConfigurations.getAllHadoopConf(conf));
+    FileSystem fs = FSUtils.getFs(basePath, HadoopConfigurations.getHadoopConf(conf));
     Properties props = new Properties();
     try {
       try (FSDataInputStream inputStream = fs.open(propertyPath)) {
@@ -83,9 +79,8 @@ public class ViewStorageProperties {
     }
   }
 
-  private static Path getPropertiesFilePath(String basePath, String uniqueId) {
+  private static Path getPropertiesFilePath(String basePath) {
     String auxPath = basePath + Path.SEPARATOR + AUXILIARYFOLDER_NAME;
-    String fileName = StringUtils.isNullOrEmpty(uniqueId) ? FILE_NAME : FILE_NAME + "_" + uniqueId;
-    return new Path(auxPath, fileName);
+    return new Path(auxPath, FILE_NAME);
   }
 }

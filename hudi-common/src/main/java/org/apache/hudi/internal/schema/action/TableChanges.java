@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -43,12 +44,12 @@ public class TableChanges {
   public static class ColumnUpdateChange extends TableChange.BaseColumnChange {
     private final Map<Integer, Types.Field> updates = new HashMap<>();
 
-    private ColumnUpdateChange(InternalSchema schema) {
-      super(schema, false);
+    public static ColumnUpdateChange get(InternalSchema schema) {
+      return new ColumnUpdateChange(schema);
     }
 
-    private ColumnUpdateChange(InternalSchema schema, boolean caseSensitive) {
-      super(schema, caseSensitive);
+    private ColumnUpdateChange(InternalSchema schema) {
+      super(schema);
     }
 
     @Override
@@ -159,7 +160,8 @@ public class TableChanges {
       if (newName == null || newName.isEmpty()) {
         throw new IllegalArgumentException(String.format("cannot rename column: %s to empty", name));
       }
-      if (internalSchema.hasColumn(newName, caseSensitive)) {
+      // keep consisitent with hive. column names insensitive, so we check 'newName.toLowerCase(Locale.ROOT)'
+      if (internalSchema.findDuplicateCol(newName.toLowerCase(Locale.ROOT))) {
         throw new IllegalArgumentException(String.format("cannot rename column: %s to a existing name", name));
       }
       // save update info
@@ -226,14 +228,6 @@ public class TableChanges {
       } else {
         throw new IllegalArgumentException(String.format("cannot find col id for given column fullName: %s", fullName));
       }
-    }
-
-    public static ColumnUpdateChange get(InternalSchema schema) {
-      return new ColumnUpdateChange(schema);
-    }
-
-    public static ColumnUpdateChange get(InternalSchema schema, boolean caseSensitive) {
-      return new ColumnUpdateChange(schema, caseSensitive);
     }
   }
 
@@ -346,7 +340,8 @@ public class TableChanges {
         }
         fullName = parent + "." + name;
       } else {
-        if (internalSchema.hasColumn(name, caseSensitive)) {
+        // keep consistent with hive, column name case insensitive
+        if (internalSchema.findDuplicateCol(name.toLowerCase(Locale.ROOT))) {
           throw new HoodieSchemaException(String.format("cannot add column: %s which already exist", name));
         }
       }

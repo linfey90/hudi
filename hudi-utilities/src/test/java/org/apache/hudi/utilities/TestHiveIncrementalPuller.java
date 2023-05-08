@@ -109,9 +109,8 @@ public class TestHiveIncrementalPuller {
     String instantTime = "101";
     HiveTestUtil.createCOWTable(instantTime, 5, true);
     hiveSyncProps.setProperty(HIVE_SYNC_MODE.key(), "jdbc");
-    try (HiveSyncTool tool = new HiveSyncTool(hiveSyncProps, HiveTestUtil.getHiveConf())) {
-      tool.syncHoodieTable();
-    }
+    HiveSyncTool tool = new HiveSyncTool(hiveSyncProps, HiveTestUtil.getHiveConf());
+    tool.syncHoodieTable();
   }
 
   private void createTargetTable() throws IOException, URISyntaxException {
@@ -119,9 +118,8 @@ public class TestHiveIncrementalPuller {
     String targetBasePath = tempDir.resolve("target_table").toAbsolutePath().toString();
     HiveTestUtil.createCOWTable(instantTime, 5, true,
         targetBasePath, "tgtdb", "test2");
-    try (HiveSyncTool tool = new HiveSyncTool(getTargetHiveSyncConfig(targetBasePath), HiveTestUtil.getHiveConf())) {
-      tool.syncHoodieTable();
-    }
+    HiveSyncTool tool = new HiveSyncTool(getTargetHiveSyncConfig(targetBasePath), HiveTestUtil.getHiveConf());
+    tool.syncHoodieTable();
   }
 
   private TypedProperties getTargetHiveSyncConfig(String basePath) {

@@ -19,6 +19,7 @@
 package org.apache.hudi.common.util.collection;
 
 import org.apache.hudi.common.util.BufferedRandomAccessFile;
+import org.apache.hudi.common.util.ClosableIterator;
 import org.apache.hudi.exception.HoodieException;
 
 import java.io.IOException;

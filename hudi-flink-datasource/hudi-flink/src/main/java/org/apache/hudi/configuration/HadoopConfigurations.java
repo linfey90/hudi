@@ -55,15 +55,6 @@ public class HadoopConfigurations {
   }
 
   /**
-   * Creates a new hadoop configuration that is initialized with the given flink configuration.
-   */
-  public static org.apache.hadoop.conf.Configuration getAllHadoopConf(Configuration conf) {
-    org.apache.hadoop.conf.Configuration hadoopConf = FlinkClientUtil.getHadoopConf();
-    conf.toMap().forEach(hadoopConf::set);
-    return hadoopConf;
-  }
-
-  /**
    * Creates a Hive configuration with configured dir path or empty if no Hive conf dir is set.
    */
   public static org.apache.hadoop.conf.Configuration getHiveConf(Configuration conf) {
@@ -72,19 +63,6 @@ public class HadoopConfigurations {
     if (explicitDir != null) {
       hadoopConf.addResource(new Path(explicitDir, "hive-site.xml"));
     }
-    return hadoopConf;
-  }
-
-  /**
-   * Creates a Hive configuration with configured dir path or empty if no Hive conf dir is set.
-   */
-  public static org.apache.hadoop.conf.Configuration getAllHiveConf(Configuration conf) {
-    String explicitDir = conf.getString(FlinkOptions.HIVE_SYNC_CONF_DIR, System.getenv("HIVE_CONF_DIR"));
-    org.apache.hadoop.conf.Configuration hadoopConf = new org.apache.hadoop.conf.Configuration();
-    if (explicitDir != null) {
-      hadoopConf.addResource(new Path(explicitDir, "hive-site.xml"));
-    }
-    conf.toMap().forEach(hadoopConf::set);
     return hadoopConf;
   }
 }

@@ -41,7 +41,7 @@ public class HoodieDeltaStreamerWrapper extends HoodieDeltaStreamer {
 
   public JavaRDD<WriteStatus> upsert(WriteOperationType operation) throws Exception {
     cfg.operation = operation;
-    return getDeltaSync().syncOnce().getRight();
+    return deltaSyncService.get().getDeltaSync().syncOnce().getRight();
   }
 
   public JavaRDD<WriteStatus> insert() throws Exception {
@@ -76,13 +76,9 @@ public class HoodieDeltaStreamerWrapper extends HoodieDeltaStreamer {
   }
 
   public Pair<SchemaProvider, Pair<String, JavaRDD<HoodieRecord>>> fetchSource() throws Exception {
-    DeltaSync service = getDeltaSync();
+    DeltaSync service = deltaSyncService.get().getDeltaSync();
     service.refreshTimeline();
     return service.readFromSource(service.getCommitTimelineOpt());
-  }
-
-  public DeltaSync getDeltaSync() {
-    return ((DeltaSyncService) ingestionService.get()).getDeltaSync();
   }
 
 }

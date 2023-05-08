@@ -287,7 +287,7 @@ public class SparkInternalSchemaConverter {
 
   /**
    * Convert Int/long type to other Type.
-   * Now only support int/long -> long/float/double/string/Decimal
+   * Now only support int/long -> long/float/double/string
    * TODO: support more types
    */
   private static boolean convertIntLongType(WritableColumnVector oldV, WritableColumnVector newV, DataType newType, int len) {
@@ -321,7 +321,7 @@ public class SparkInternalSchemaConverter {
 
   /**
    * Convert float type to other Type.
-   * Now only support float -> double/String/Decimal
+   * Now only support float -> double/String
    * TODO: support more types
    */
   private static boolean convertFloatType(WritableColumnVector oldV, WritableColumnVector newV, DataType newType, int len) {

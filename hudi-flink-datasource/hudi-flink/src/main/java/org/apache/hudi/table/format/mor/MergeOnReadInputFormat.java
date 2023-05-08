@@ -27,7 +27,7 @@ import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieRecordMerger;
 import org.apache.hudi.common.table.log.HoodieMergedLogRecordScanner;
 import org.apache.hudi.common.table.log.InstantRange;
-import org.apache.hudi.common.util.collection.ClosableIterator;
+import org.apache.hudi.common.util.ClosableIterator;
 import org.apache.hudi.common.util.HoodieRecordUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.Pair;
@@ -181,7 +181,7 @@ public class MergeOnReadInputFormat
   public void open(MergeOnReadInputSplit split) throws IOException {
     this.currentReadCount = 0L;
     this.closed = false;
-    this.hadoopConf = HadoopConfigurations.getAllHadoopConf(this.conf);
+    this.hadoopConf = HadoopConfigurations.getHadoopConf(this.conf);
     this.iterator = initIterator(split);
     mayShiftInputSplit(split);
   }
@@ -228,7 +228,7 @@ public class MergeOnReadInputFormat
           + "file path: " + split.getBasePath()
           + "log paths: " + split.getLogPaths()
           + "hoodie table path: " + split.getTablePath()
-          + "flink partition Index: " + split.getSplitNumber()
+          + "spark partition Index: " + split.getSplitNumber()
           + "merge type: " + split.getMergeType());
     }
   }

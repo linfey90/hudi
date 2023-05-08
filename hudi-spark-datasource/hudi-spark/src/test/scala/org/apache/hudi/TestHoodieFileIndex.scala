@@ -41,7 +41,6 @@ import org.apache.hudi.exception.HoodieException
 import org.apache.hudi.keygen.ComplexKeyGenerator
 import org.apache.hudi.keygen.TimestampBasedAvroKeyGenerator.TimestampType
 import org.apache.hudi.keygen.constant.KeyGeneratorOptions.Config
-import org.apache.hudi.testutils.HoodieSparkClientTestBase
 import org.apache.hudi.metadata.HoodieTableMetadata
 import org.apache.hudi.testutils.HoodieClientTestBase
 import org.apache.hudi.util.JFunction
@@ -62,7 +61,7 @@ import scala.collection.JavaConversions._
 import scala.collection.JavaConverters._
 import scala.util.Random
 
-class TestHoodieFileIndex extends HoodieSparkClientTestBase with ScalaAssertionSupport {
+class TestHoodieFileIndex extends HoodieClientTestBase with ScalaAssertionSupport {
 
   var spark: SparkSession = _
   val commonOpts = Map(

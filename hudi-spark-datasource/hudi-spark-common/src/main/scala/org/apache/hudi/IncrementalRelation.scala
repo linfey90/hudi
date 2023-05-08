@@ -101,10 +101,10 @@ class IncrementalRelation(val sqlContext: SQLContext,
     }
 
     val tableSchema = if (useEndInstantSchema && iSchema.isEmptySchema) {
-      if (commitsToReturn.isEmpty) schemaResolver.getTableAvroSchema(false) else
+      if (commitsToReturn.isEmpty) schemaResolver.getTableAvroSchemaWithoutMetadataFields() else
         schemaResolver.getTableAvroSchema(commitsToReturn.last, false)
     } else {
-      schemaResolver.getTableAvroSchema(false)
+      schemaResolver.getTableAvroSchemaWithoutMetadataFields()
     }
     if (tableSchema.getType == Schema.Type.NULL) {
       // if there is only one commit in the table and is an empty commit without schema, return empty RDD here

@@ -42,12 +42,13 @@ public class DirectMarkerTransactionManager extends TransactionManager {
   private final String filePath;
 
   public DirectMarkerTransactionManager(HoodieWriteConfig config, FileSystem fs, String partitionPath, String fileId) {
-    super(new LockManager(config, fs, createUpdatedLockProps(config, partitionPath, fileId)), config.needsLockGuard());
+    super(new LockManager(config, fs, createUpdatedLockProps(config, partitionPath, fileId)),
+        config.getWriteConcurrencyMode().supportsOptimisticConcurrencyControl());
     this.filePath = partitionPath + "/" + fileId;
   }
 
   public void beginTransaction(String newTxnOwnerInstantTime) {
-    if (needsLockGuard) {
+    if (isOptimisticConcurrencyControlEnabled) {
       LOG.info("Transaction starting for " + newTxnOwnerInstantTime + " and " + filePath);
       lockManager.lock();
 
@@ -57,7 +58,7 @@ public class DirectMarkerTransactionManager extends TransactionManager {
   }
 
   public void endTransaction(String currentTxnOwnerInstantTime) {
-    if (needsLockGuard) {
+    if (isOptimisticConcurrencyControlEnabled) {
       LOG.info("Transaction ending with transaction owner " + currentTxnOwnerInstantTime
           + " for " + filePath);
       if (reset(Option.of(getInstant(currentTxnOwnerInstantTime)), Option.empty(), Option.empty())) {

@@ -20,7 +20,6 @@ package org.apache.spark.sql.hive
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.catalog.ExternalCatalogWithListener
 import org.apache.spark.sql.hive.client.HiveClient
 
 object HiveClientUtils {
@@ -30,22 +29,14 @@ object HiveClientUtils {
    */
   @volatile private var client: HiveClient = null
 
-  private def newClientForMetadata(conf: SparkConf, hadoopConf: Configuration): HiveClient = {
+  def newClientForMetadata(conf: SparkConf, hadoopConf: Configuration): HiveClient = {
     HiveUtils.newClientForMetadata(conf, hadoopConf)
   }
 
-  def getSingletonClientForMetadata(sparkSession: SparkSession): HiveClient = {
+  def getSingletonClientForMetadata(sparkSession: SparkSession): HiveClient = synchronized {
     if (client == null) {
-      synchronized {
-        if (client == null) {
-          sparkSession.sessionState.catalog.externalCatalog match {
-            case catalogWrapper: ExternalCatalogWithListener if catalogWrapper.unwrapped.isInstanceOf[HiveExternalCatalog] =>
-              client = catalogWrapper.unwrapped.asInstanceOf[HiveExternalCatalog].client
-            case _ =>
-              client = newClientForMetadata(sparkSession.sparkContext.conf, sparkSession.sessionState.newHadoopConf())
-          }
-        }
-      }
+      client = HiveUtils.newClientForMetadata(sparkSession.sparkContext.conf,
+        sparkSession.sessionState.newHadoopConf())
     }
     client
   }

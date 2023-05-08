@@ -67,7 +67,6 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.source.InputFormatSourceFunction;
 import org.apache.flink.streaming.api.operators.OneInputStreamOperatorFactory;
 import org.apache.flink.table.api.DataTypes;
-import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.source.DynamicTableSource;
@@ -154,8 +153,8 @@ public class HoodieTableSource implements
       @Nullable Long limit,
       @Nullable HoodieTableMetaClient metaClient,
       @Nullable InternalSchemaManager internalSchemaManager) {
-    this.schema = ResolvedSchema.of(schema.getColumns().stream().filter(Column::isPhysical).collect(Collectors.toList()));
-    this.tableRowType = (RowType) this.schema.toSourceRowDataType().notNull().getLogicalType();
+    this.schema = schema;
+    this.tableRowType = (RowType) schema.toPhysicalRowDataType().notNull().getLogicalType();
     this.path = path;
     this.partitionKeys = partitionKeys;
     this.defaultPartName = defaultPartName;
@@ -168,8 +167,7 @@ public class HoodieTableSource implements
         ? IntStream.range(0, this.tableRowType.getFieldCount()).toArray()
         : requiredPos;
     this.limit = limit == null ? NO_LIMIT_CONSTANT : limit;
-    // merge conf
-    this.hadoopConf = HadoopConfigurations.getAllHadoopConf(conf);
+    this.hadoopConf = HadoopConfigurations.getHadoopConf(conf);
     this.metaClient = metaClient == null ? StreamerUtil.metaClientForReader(conf, hadoopConf) : metaClient;
     this.maxCompactionMemoryInBytes = StreamerUtil.getMaxCompactionMemoryInBytes(conf);
     this.internalSchemaManager = internalSchemaManager == null

@@ -34,7 +34,6 @@ import org.apache.hudi.exception.HoodieCatalogException;
 import org.apache.hudi.exception.HoodieMetadataException;
 import org.apache.hudi.hadoop.utils.HoodieInputFormatUtils;
 import org.apache.hudi.sync.common.util.ConfigUtils;
-import org.apache.hudi.table.HoodieTableFactory;
 import org.apache.hudi.table.format.FilePathUtils;
 import org.apache.hudi.util.AvroSchemaConverter;
 import org.apache.hudi.util.DataTypeUtils;
@@ -75,7 +74,6 @@ import org.apache.flink.table.catalog.exceptions.TablePartitionedException;
 import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
 import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.expressions.Expression;
-import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.types.DataType;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -104,7 +102,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.apache.flink.sql.parser.hive.ddl.SqlAlterHiveDatabase.ALTER_DATABASE_OP;
 import static org.apache.flink.sql.parser.hive.ddl.SqlAlterHiveDatabaseOwner.DATABASE_OWNER_NAME;
@@ -155,11 +152,6 @@ public class HoodieHiveCatalog extends AbstractCatalog {
   }
 
   @Override
-  public Optional<Factory> getFactory() {
-    return Optional.of(new HoodieTableFactory(this));
-  }
-
-  @Override
   public void open() throws CatalogException {
     if (this.client == null) {
       try {
@@ -168,6 +160,15 @@ public class HoodieHiveCatalog extends AbstractCatalog {
         throw new HoodieCatalogException("Failed to create hive metastore client", e);
       }
       LOG.info("Connected to Hive metastore");
+    }
+    if (!databaseExists(getDefaultDatabase())) {
+      LOG.info("{} does not exist, will be created.", getDefaultDatabase());
+      CatalogDatabase database = new CatalogDatabaseImpl(Collections.emptyMap(), "default database");
+      try {
+        createDatabase(getDefaultDatabase(), database, true);
+      } catch (DatabaseAlreadyExistException e) {
+        throw new HoodieCatalogException(getName(), e);
+      }
     }
   }
 
@@ -416,11 +417,11 @@ public class HoodieHiveCatalog extends AbstractCatalog {
     String path = hiveTable.getSd().getLocation();
     Map<String, String> parameters = hiveTable.getParameters();
     Schema latestTableSchema = StreamerUtil.getLatestTableSchema(path, hiveConf);
+    String pkColumnsStr = parameters.get(FlinkOptions.RECORD_KEY_FIELD.key());
+    List<String> pkColumns = StringUtils.isNullOrEmpty(pkColumnsStr)
+        ? null : StringUtils.split(pkColumnsStr, ",");
     org.apache.flink.table.api.Schema schema;
     if (latestTableSchema != null) {
-      String pkColumnsStr = parameters.get(FlinkOptions.RECORD_KEY_FIELD.key());
-      List<String> pkColumns = StringUtils.isNullOrEmpty(pkColumnsStr)
-          ? null : StringUtils.split(pkColumnsStr, ",");
       // if the table is initialized from spark, the write schema is nullable for pk columns.
       DataType tableDataType = DataTypeUtils.ensureColumnsAsNonNullable(
           AvroSchemaConverter.convertToDataType(latestTableSchema), pkColumns);
@@ -842,7 +843,7 @@ public class HoodieHiveCatalog extends AbstractCatalog {
     } catch (Exception e) {
       throw new CatalogException(
           String.format(
-              "Failed to drop partition %s of table %s", partitionSpec, tablePath), e);
+              "Failed to drop partition %s of table %s", partitionSpec, tablePath));
     }
   }
 
@@ -962,7 +963,7 @@ public class HoodieHiveCatalog extends AbstractCatalog {
       return options;
     } else {
       Map<String, String> newOptions = new HashMap<>(options);
-      // todo fy set up hive sync options
+      // set up hive sync options
       newOptions.putIfAbsent(FlinkOptions.HIVE_SYNC_ENABLED.key(), "true");
       newOptions.putIfAbsent(FlinkOptions.HIVE_SYNC_METASTORE_URIS.key(), hiveConf.getVar(HiveConf.ConfVars.METASTOREURIS));
       newOptions.putIfAbsent(FlinkOptions.HIVE_SYNC_MODE.key(), "hms");

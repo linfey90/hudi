@@ -237,10 +237,9 @@ public class ColumnStatsIndexHelper {
             .filter(Objects::nonNull);
 
     StructType indexSchema = ColumnStatsIndexSupport$.MODULE$.composeIndexSchema(
-          JavaConverters$.MODULE$.collectionAsScalaIterableConverter(columnNames).asScala().toSeq(),
-          JavaConverters$.MODULE$.collectionAsScalaIterableConverter(columnNames).asScala().toSet(),
-          StructType$.MODULE$.apply(orderedColumnSchemas)
-    )._1;
+        JavaConverters$.MODULE$.collectionAsScalaIterableConverter(columnNames).asScala().toSeq(),
+        StructType$.MODULE$.apply(orderedColumnSchemas)
+    );
 
     return sparkSession.createDataFrame(allMetaDataRDD, indexSchema);
   }

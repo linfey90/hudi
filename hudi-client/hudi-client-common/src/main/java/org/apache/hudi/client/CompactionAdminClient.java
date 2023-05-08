@@ -507,6 +507,9 @@ public class CompactionAdminClient extends BaseHoodieClient {
    * Holds Operation result for Renaming.
    */
   public static class ValidationOpResult extends OperationResult<CompactionOperation> {
+
+    public ValidationOpResult() {}
+
     public ValidationOpResult(CompactionOperation operation, boolean success, Option<Exception> exception) {
       super(operation, success, exception);
     }
@@ -517,6 +520,8 @@ public class CompactionAdminClient extends BaseHoodieClient {
     public String fileId;
     public String srcPath;
     public String destPath;
+
+    public RenameInfo() {}
 
     public RenameInfo(String fileId, String srcPath, String destPath) {
       this.fileId = fileId;

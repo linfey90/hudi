@@ -91,26 +91,14 @@ public class HoodieMetadataFileSystemView extends HoodieTableFileSystemView {
 
   @Override
   public void reset() {
-    try {
-      writeLock.lock();
-      clear();
-      // Initialize with new Hoodie timeline.
-      init(metaClient, getTimeline());
-      tableMetadata.reset();
-    } finally {
-      writeLock.unlock();
-    }
+    super.reset();
+    tableMetadata.reset();
   }
 
   @Override
   public void sync() {
-    try {
-      writeLock.lock();
-      maySyncIncrementally();
-      tableMetadata.reset();
-    } finally {
-      writeLock.unlock();
-    }
+    super.sync();
+    tableMetadata.reset();
   }
 
   @Override

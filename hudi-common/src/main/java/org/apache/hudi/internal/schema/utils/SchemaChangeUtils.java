@@ -38,9 +38,9 @@ public class SchemaChangeUtils {
   /**
    * Whether to allow the column type to be updated.
    * now only support:
-   * int => long/float/double/String/Decimal
-   * long => float/double/String/Decimal
-   * float => double/String/Decimal
+   * int => long/float/double/string
+   * long => float/double/string
+   * float => double/String
    * double => String/Decimal
    * Decimal => Decimal/String
    * String => date/decimal
@@ -75,9 +75,6 @@ public class SchemaChangeUtils {
           Types.DecimalType decimalSrc = (Types.DecimalType)src;
           Types.DecimalType decimalDsr = (Types.DecimalType)dsr;
           if (decimalDsr.isWiderThan(decimalSrc)) {
-            return true;
-          }
-          if (decimalDsr.precision() >= decimalSrc.precision() && decimalDsr.scale() == decimalSrc.scale()) {
             return true;
           }
         } else if (dsr.typeId() == Type.TypeID.STRING) {

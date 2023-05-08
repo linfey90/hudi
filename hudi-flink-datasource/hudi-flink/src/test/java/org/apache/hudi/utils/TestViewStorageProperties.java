@@ -27,8 +27,6 @@ import org.apache.hudi.util.ViewStorageProperties;
 import org.apache.flink.configuration.Configuration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.File;
 import java.io.IOException;
@@ -43,21 +41,19 @@ public class TestViewStorageProperties {
   @TempDir
   File tempFile;
 
-  @ParameterizedTest
-  @ValueSource(strings = {"", "1"})
-  void testReadWriteProperties(String uniqueId) throws IOException {
+  @Test
+  void testReadWriteProperties() throws IOException {
     String basePath = tempFile.getAbsolutePath();
     FileSystemViewStorageConfig config = FileSystemViewStorageConfig.newBuilder()
         .withStorageType(FileSystemViewStorageType.SPILLABLE_DISK)
         .withRemoteServerHost("host1")
         .withRemoteServerPort(1234).build();
     Configuration flinkConfig = new Configuration();
-    flinkConfig.setString(FlinkOptions.WRITE_CLIENT_ID, uniqueId);
     ViewStorageProperties.createProperties(basePath, config, flinkConfig);
     ViewStorageProperties.createProperties(basePath, config, flinkConfig);
     ViewStorageProperties.createProperties(basePath, config, flinkConfig);
 
-    FileSystemViewStorageConfig readConfig = ViewStorageProperties.loadFromProperties(basePath, flinkConfig);
+    FileSystemViewStorageConfig readConfig = ViewStorageProperties.loadFromProperties(basePath, new Configuration());
     assertThat(readConfig.getStorageType(), is(FileSystemViewStorageType.SPILLABLE_DISK));
     assertThat(readConfig.getRemoteViewServerHost(), is("host1"));
     assertThat(readConfig.getRemoteViewServerPort(), is(1234));

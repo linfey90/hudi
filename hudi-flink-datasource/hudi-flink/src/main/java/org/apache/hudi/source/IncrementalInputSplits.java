@@ -535,8 +535,7 @@ public class IncrementalInputSplits implements Serializable {
    *
    * @return the filtered timeline
    */
-  @VisibleForTesting
-  public HoodieTimeline filterInstantsByCondition(HoodieTimeline timeline) {
+  private HoodieTimeline filterInstantsByCondition(HoodieTimeline timeline) {
     final HoodieTimeline oriTimeline = timeline;
     if (this.skipCompaction) {
       // the compaction commit uses 'commit' as action which is tricky
@@ -602,7 +601,7 @@ public class IncrementalInputSplits implements Serializable {
     // skip compaction
     private boolean skipCompaction = false;
     // skip clustering
-    private boolean skipClustering = false;
+    private boolean skipClustering = true;
 
     public Builder() {
     }

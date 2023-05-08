@@ -18,22 +18,23 @@
 
 package org.apache.hudi
 
-import org.apache.hudi.HoodieBaseRelation.BaseFileReader
-import org.apache.hudi.common.util.ValidationUtils.checkState
+import org.apache.spark.{Partition, TaskContext}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.HoodieCatalystExpressionUtils.generateUnsafeProjection
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.JoinedRow
+import org.apache.spark.sql.execution.datasources.PartitionedFile
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.{Partition, TaskContext}
+
+import org.apache.hudi.HoodieDataSourceHelper._
 
 class HoodieBootstrapRDD(@transient spark: SparkSession,
-                         bootstrapDataFileReader: BaseFileReader,
-                         bootstrapSkeletonFileReader: BaseFileReader,
-                         regularFileReader: BaseFileReader,
-                         requiredSchema: HoodieTableSchema,
-                         @transient splits: Seq[HoodieBootstrapSplit])
+                        dataReadFunction: PartitionedFile => Iterator[InternalRow],
+                        skeletonReadFunction: PartitionedFile => Iterator[InternalRow],
+                        regularReadFunction: PartitionedFile => Iterator[InternalRow],
+                        dataSchema: StructType,
+                        skeletonSchema: StructType,
+                        requiredColumns: Array[String],
+                        tableState: HoodieBootstrapTableState)
   extends RDD[InternalRow](spark.sparkContext, Nil) {
 
   override def compute(split: Partition, context: TaskContext): Iterator[InternalRow] = {
@@ -50,57 +51,59 @@ class HoodieBootstrapRDD(@transient spark: SparkSession,
       }
     }
 
-    bootstrapPartition.split.skeletonFile match {
-      case Some(skeletonFile) =>
-        // It is a bootstrap split. Check both skeleton and data files.
-        val (iterator, schema) = if (bootstrapDataFileReader.schema.isEmpty) {
-          // No data column to fetch, hence fetch only from skeleton file
-          (bootstrapSkeletonFileReader.read(skeletonFile), bootstrapSkeletonFileReader.schema)
-        } else if (bootstrapSkeletonFileReader.schema.isEmpty) {
-          // No metadata column to fetch, hence fetch only from data file
-          (bootstrapDataFileReader.read(bootstrapPartition.split.dataFile), bootstrapDataFileReader.schema)
-        } else {
-          // Fetch from both data and skeleton file, and merge
-          val dataFileIterator = bootstrapDataFileReader.read(bootstrapPartition.split.dataFile)
-          val skeletonFileIterator = bootstrapSkeletonFileReader.read(skeletonFile)
-          val mergedSchema = StructType(bootstrapSkeletonFileReader.schema.fields ++ bootstrapDataFileReader.schema.fields)
+    var partitionedFileIterator: Iterator[InternalRow] = null
 
-          (merge(skeletonFileIterator, dataFileIterator), mergedSchema)
-        }
+    if (bootstrapPartition.split.skeletonFile.isDefined) {
+      // It is a bootstrap split. Check both skeleton and data files.
+      if (dataSchema.isEmpty) {
+        // No data column to fetch, hence fetch only from skeleton file
+        partitionedFileIterator = skeletonReadFunction(bootstrapPartition.split.skeletonFile.get)
+      } else if (skeletonSchema.isEmpty) {
+        // No metadata column to fetch, hence fetch only from data file
+        partitionedFileIterator = dataReadFunction(bootstrapPartition.split.dataFile)
+      } else {
+        // Fetch from both data and skeleton file, and merge
+        val dataFileIterator = dataReadFunction(bootstrapPartition.split.dataFile)
+        val skeletonFileIterator = skeletonReadFunction(bootstrapPartition.split.skeletonFile.get)
+        partitionedFileIterator = merge(skeletonFileIterator, dataFileIterator)
+      }
+    } else {
+      partitionedFileIterator = regularReadFunction(bootstrapPartition.split.dataFile)
+    }
+    partitionedFileIterator
+  }
 
-        // NOTE: Here we have to project the [[InternalRow]]s fetched into the expected target schema.
-        //       These could diverge for ex, when requested schema contains partition columns which might not be
-        //       persisted w/in the data file, but instead would be parsed from the partition path. In that case
-        //       output of the file-reader will have different ordering of the fields than the original required
-        //       schema (for more details please check out [[ParquetFileFormat]] implementation).
-        val unsafeProjection = generateUnsafeProjection(schema, requiredSchema.structTypeSchema)
-
-        iterator.map(unsafeProjection)
-
-      case _ =>
-        // NOTE: Regular file-reader is already projected into the required schema
-        regularFileReader.read(bootstrapPartition.split.dataFile)
+  def merge(skeletonFileIterator: Iterator[InternalRow], dataFileIterator: Iterator[InternalRow])
+  : Iterator[InternalRow] = {
+    new Iterator[InternalRow] {
+      override def hasNext: Boolean = dataFileIterator.hasNext && skeletonFileIterator.hasNext
+      override def next(): InternalRow = {
+        mergeInternalRow(skeletonFileIterator.next(), dataFileIterator.next())
+      }
     }
   }
 
-  def merge(skeletonFileIterator: Iterator[InternalRow], dataFileIterator: Iterator[InternalRow]): Iterator[InternalRow] = {
-    new Iterator[InternalRow] {
-      private val combinedRow = new JoinedRow()
-
-      override def hasNext: Boolean = {
-        checkState(dataFileIterator.hasNext == skeletonFileIterator.hasNext,
-          "Bootstrap data-file iterator and skeleton-file iterator have to be in-sync!")
-        dataFileIterator.hasNext && skeletonFileIterator.hasNext
+  def mergeInternalRow(skeletonRow: InternalRow, dataRow: InternalRow): InternalRow = {
+    val skeletonArr  = skeletonRow.copy().toSeq(skeletonSchema)
+    val dataArr = dataRow.copy().toSeq(dataSchema)
+    // We need to return it in the order requested
+    val mergedArr = requiredColumns.map(col => {
+      if (skeletonSchema.fieldNames.contains(col)) {
+        val idx = skeletonSchema.fieldIndex(col)
+        skeletonArr(idx)
+      } else {
+        val idx = dataSchema.fieldIndex(col)
+        dataArr(idx)
       }
+    })
 
-      override def next(): InternalRow = {
-        combinedRow(skeletonFileIterator.next(), dataFileIterator.next())
-      }
-    }
+    logDebug("Merged data and skeleton values => " + mergedArr.mkString(","))
+    val mergedRow = InternalRow.fromSeq(mergedArr)
+    mergedRow
   }
 
   override protected def getPartitions: Array[Partition] = {
-    splits.zipWithIndex.map(file => {
+    tableState.files.zipWithIndex.map(file => {
       if (file._1.skeletonFile.isDefined) {
         logDebug("Forming partition with => Index: " + file._2 + ", Files: " + file._1.dataFile.filePath
           + "," + file._1.skeletonFile.get.filePath)

@@ -55,8 +55,8 @@ public class SyncUtilHelpers {
                                        FileSystem fs,
                                        String targetBasePath,
                                        String baseFileFormat) {
-    try (HoodieSyncTool syncTool = instantiateMetaSyncTool(syncToolClassName, props, hadoopConfig, fs, targetBasePath, baseFileFormat)) {
-      syncTool.syncHoodieTable();
+    try {
+      instantiateMetaSyncTool(syncToolClassName, props, hadoopConfig, fs, targetBasePath, baseFileFormat).syncHoodieTable();
     } catch (Throwable e) {
       throw new HoodieException("Could not sync using the meta sync class " + syncToolClassName, e);
     }

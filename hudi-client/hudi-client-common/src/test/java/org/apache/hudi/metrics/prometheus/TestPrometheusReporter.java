@@ -29,8 +29,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.UUID;
-
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.when;
 
@@ -39,14 +37,10 @@ public class TestPrometheusReporter {
 
   @Mock
   HoodieWriteConfig config;
-  HoodieMetrics hoodieMetrics;
-  Metrics metrics;
 
   @AfterEach
   void shutdownMetrics() {
-    if (metrics != null) {
-      metrics.shutdown();
-    }
+    Metrics.shutdown();
   }
 
   @Test
@@ -55,11 +49,8 @@ public class TestPrometheusReporter {
     when(config.getTableName()).thenReturn("foo");
     when(config.getMetricsReporterType()).thenReturn(MetricsReporterType.PROMETHEUS);
     when(config.getPrometheusPort()).thenReturn(9090);
-    when(config.getBasePath()).thenReturn("s3://test" + UUID.randomUUID());
     assertDoesNotThrow(() -> {
       new HoodieMetrics(config);
-      hoodieMetrics = new HoodieMetrics(config);
-      metrics = hoodieMetrics.getMetrics();
     });
   }
 }

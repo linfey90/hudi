@@ -23,7 +23,6 @@ import org.apache.hudi.common.model.DefaultHoodieRecordPayload;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.cdc.HoodieCDCSupplementalLoggingMode;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
-import org.apache.hudi.common.util.CollectionUtils;
 import org.apache.hudi.configuration.FlinkOptions;
 import org.apache.hudi.table.catalog.HoodieCatalogTestUtils;
 import org.apache.hudi.table.catalog.HoodieHiveCatalog;
@@ -361,36 +360,6 @@ public class ITTestHoodieDataSource {
   }
 
   @Test
-  void testAppendWriteWithClusteringBatchRead() throws Exception {
-    // create filesystem table named source
-    String createSource = TestConfigurations.getFileSourceDDL("source", 4);
-    streamTableEnv.executeSql(createSource);
-
-    String hoodieTableDDL = sql("t1")
-        .option(FlinkOptions.PATH, tempFile.getAbsolutePath())
-        .option(FlinkOptions.OPERATION, "insert")
-        .option(FlinkOptions.CLUSTERING_SCHEDULE_ENABLED,true)
-        .option(FlinkOptions.CLUSTERING_ASYNC_ENABLED, true)
-        .option(FlinkOptions.CLUSTERING_DELTA_COMMITS,2)
-        .option(FlinkOptions.CLUSTERING_TASKS, 1)
-        .option(FlinkOptions.CLEAN_RETAIN_COMMITS, 1)
-        .end();
-    streamTableEnv.executeSql(hoodieTableDDL);
-    String insertInto = "insert into t1 select * from source";
-    execInsertSql(streamTableEnv, insertInto);
-
-    streamTableEnv.getConfig().getConfiguration()
-            .setBoolean("table.dynamic-table-options.enabled", true);
-    final String query = String.format("select * from t1/*+ options('read.start-commit'='%s')*/",
-            FlinkOptions.START_COMMIT_EARLIEST);
-
-    List<Row> rows = execSelectSql(streamTableEnv, query, 10);
-    // batch read will not lose data when cleaned clustered files.
-    assertRowsEquals(rows, CollectionUtils.combine(TestData.DATA_SET_SOURCE_INSERT_FIRST_COMMIT,
-        TestData.DATA_SET_SOURCE_INSERT_LATEST_COMMIT));
-  }
-
-  @Test
   void testStreamWriteWithCleaning() {
     // create filesystem table named source
 
@@ -709,16 +678,14 @@ public class ITTestHoodieDataSource {
         + "(1,'Danny',TIMESTAMP '2021-12-01 01:02:01.100001'),\n"
         + "(2,'Stephen',TIMESTAMP '2021-12-02 03:04:02.200002'),\n"
         + "(3,'Julian',TIMESTAMP '2021-12-03 13:14:03.300003'),\n"
-        + "(4,'Fabian',TIMESTAMP '2021-12-04 15:16:04.400004'),\n"
-        + "(5,'Tom',TIMESTAMP '2721-12-04 15:16:04.500005')";
+        + "(4,'Fabian',TIMESTAMP '2021-12-04 15:16:04.400004')";
     execInsertSql(streamTableEnv, insertInto);
 
     final String expected = "["
         + "+I[1, Danny, 2021-12-01T01:02:01.100001], "
         + "+I[2, Stephen, 2021-12-02T03:04:02.200002], "
         + "+I[3, Julian, 2021-12-03T13:14:03.300003], "
-        + "+I[4, Fabian, 2021-12-04T15:16:04.400004], "
-        + "+I[5, Tom, 2721-12-04T15:16:04.500005]]";
+        + "+I[4, Fabian, 2021-12-04T15:16:04.400004]]";
 
     List<Row> result = execSelectSql(streamTableEnv, "select * from t1", execMode);
     assertRowsEquals(result, expected);
@@ -1100,32 +1067,6 @@ public class ITTestHoodieDataSource {
   }
 
   @Test
-  void testBulkInsertWithSortByRecordKey() {
-    TableEnvironment tableEnv = batchTableEnv;
-
-    String hoodieTableDDL = sql("t1")
-        .option(FlinkOptions.PATH, tempFile.getAbsolutePath())
-        .option(FlinkOptions.OPERATION, "bulk_insert")
-        .option(FlinkOptions.WRITE_BULK_INSERT_SHUFFLE_INPUT, true)
-        .option(FlinkOptions.WRITE_BULK_INSERT_SORT_INPUT, true)
-        .option(FlinkOptions.WRITE_BULK_INSERT_SORT_INPUT_BY_RECORD_KEY, true)
-        .end();
-    tableEnv.executeSql(hoodieTableDDL);
-
-    final String insertInto = "insert into t1 values\n"
-        + "('id2','Stephen',33,TIMESTAMP '1970-01-01 00:00:02','par1'),\n"
-        + "('id1','Julian',53,TIMESTAMP '1970-01-01 00:00:03','par1')";
-
-    execInsertSql(tableEnv, insertInto);
-
-    List<Row> result = CollectionUtil.iterableToList(
-        () -> tableEnv.sqlQuery("select * from t1").execute().collect());
-    assertRowsEquals(result, "["
-        + "+I[id1, Julian, 53, 1970-01-01T00:00:03, par1], "
-        + "+I[id2, Stephen, 33, 1970-01-01T00:00:02, par1]]", 4);
-  }
-
-  @Test
   void testBulkInsertNonPartitionedTable() {
     TableEnvironment tableEnv = batchTableEnv;
     String hoodieTableDDL = sql("t1")
@@ -1366,7 +1307,6 @@ public class ITTestHoodieDataSource {
     conf.setInteger(FlinkOptions.ARCHIVE_MAX_COMMITS, 4);
     conf.setInteger(FlinkOptions.CLEAN_RETAIN_COMMITS, 2);
     conf.setString("hoodie.commits.archival.batch", "1");
-    conf.setBoolean(FlinkOptions.METADATA_ENABLED, false);
 
     // write 10 batches of data set
     for (int i = 0; i < 20; i += 2) {
@@ -1380,7 +1320,6 @@ public class ITTestHoodieDataSource {
         .option(FlinkOptions.PATH, tempFile.getAbsolutePath())
         .option(FlinkOptions.TABLE_TYPE, tableType)
         .option(FlinkOptions.READ_START_COMMIT, secondArchived)
-        .option(FlinkOptions.METADATA_ENABLED, false)
         .end();
     tableEnv.executeSql(hoodieTableDDL);
 
@@ -1583,13 +1522,6 @@ public class ITTestHoodieDataSource {
         + "+I[id6, Emma, 20, 1970-01-01T00:00:06, par3], "
         + "+I[id7, Bob, 44, 1970-01-01T00:00:07, par4], "
         + "+I[id8, Han, 56, 1970-01-01T00:00:08, par4]]");
-    // filter by in expression
-    List<Row> result4 = CollectionUtil.iterableToList(
-        () -> tableEnv.sqlQuery("select * from t1 where uuid in ('id6', 'id7', 'id8')").execute().collect());
-    assertRowsEquals(result4, "["
-        + "+I[id6, Emma, 20, 1970-01-01T00:00:06, par3], "
-        + "+I[id7, Bob, 44, 1970-01-01T00:00:07, par4], "
-        + "+I[id8, Han, 56, 1970-01-01T00:00:08, par4]]");
   }
 
   @Test
@@ -1701,34 +1633,6 @@ public class ITTestHoodieDataSource {
 
     List<Row> result2 = CollectionUtil.iterableToList(
         () -> tableEnv.sqlQuery("select f3 from t1").execute().collect());
-    assertRowsEquals(result2, "[+I[3]]");
-  }
-
-  @Test
-  void testWriteReadWithComputedColumnsInTheMiddle() {
-    TableEnvironment tableEnv = batchTableEnv;
-    String createTable = sql("t1")
-        .field("f0 int")
-        .field("f1 int")
-        .field("f2 as f0 + f1")
-        .field("f3 varchar(10)")
-        .option(FlinkOptions.PATH, tempFile.getAbsolutePath())
-        .option(FlinkOptions.PRECOMBINE_FIELD, "f1")
-        .pkField("f0")
-        .noPartition()
-        .end();
-    tableEnv.executeSql(createTable);
-
-    String insertInto = "insert into t1(f0, f1, f3) values\n"
-        + "(1, 2, 'abc')";
-    execInsertSql(tableEnv, insertInto);
-
-    List<Row> result1 = CollectionUtil.iterableToList(
-        () -> tableEnv.sqlQuery("select * from t1").execute().collect());
-    assertRowsEquals(result1, "[+I[1, 2, 3, abc]]");
-
-    List<Row> result2 = CollectionUtil.iterableToList(
-        () -> tableEnv.sqlQuery("select f2 from t1").execute().collect());
     assertRowsEquals(result2, "[+I[3]]");
   }
 

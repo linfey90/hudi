@@ -22,7 +22,6 @@ import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.configuration.FlinkOptions;
 
 import org.apache.flink.configuration.Configuration;
-import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -38,19 +37,9 @@ public class TestWriteMergeOnReadWithCompact extends TestWriteCopyOnWrite {
     conf.setInteger(FlinkOptions.COMPACTION_DELTA_COMMITS, 1);
   }
 
-  @Test
-  public void testInsertAppendMode() {
-    // append mode is only valid for cow table.
-  }
-
   @Override
   public void testInsertClustering() {
     // insert clustering is only valid for cow table.
-  }
-
-  @Test
-  public void testInsertAsyncClustering() {
-    // insert async clustering is only valid for cow table.
   }
 
   @Override

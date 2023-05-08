@@ -78,18 +78,7 @@ public abstract class IncrementalTimelineSyncFileSystemView extends AbstractTabl
   }
 
   @Override
-  public void sync() {
-    try {
-      writeLock.lock();
-      maySyncIncrementally();
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  protected void maySyncIncrementally() {
-    HoodieTimeline oldTimeline = getTimeline();
-    HoodieTimeline newTimeline = metaClient.reloadActiveTimeline().filterCompletedOrMajorOrMinorCompactionInstants();
+  protected void runSync(HoodieTimeline oldTimeline, HoodieTimeline newTimeline) {
     try {
       if (incrementalTimelineSyncEnabled) {
         TimelineDiffResult diffResult = TimelineDiffHelper.getNewInstantsForIncrementalSync(oldTimeline, newTimeline);
@@ -105,15 +94,14 @@ public abstract class IncrementalTimelineSyncFileSystemView extends AbstractTabl
     } catch (Exception ioe) {
       LOG.error("Got exception trying to perform incremental sync. Reverting to complete sync", ioe);
     }
-    clear();
-    // Initialize with new Hoodie timeline.
-    init(metaClient, newTimeline);
+
+    super.runSync(oldTimeline, newTimeline);
   }
 
   /**
    * Run incremental sync based on the diff result produced.
    *
-   * @param timeline   New Timeline
+   * @param timeline New Timeline
    * @param diffResult Timeline Diff Result
    */
   private void runIncrementalSync(HoodieTimeline timeline, TimelineDiffResult diffResult) {

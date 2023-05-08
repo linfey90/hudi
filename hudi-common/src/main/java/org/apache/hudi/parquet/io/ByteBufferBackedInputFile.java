@@ -38,6 +38,10 @@ public class ByteBufferBackedInputFile implements InputFile {
     this.length = length;
   }
 
+  public ByteBufferBackedInputFile(byte[] buffer) {
+    this(buffer, 0, buffer.length);
+  }
+
   @Override
   public long getLength() {
     return length;
