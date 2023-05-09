@@ -25,10 +25,7 @@ import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.configuration.FlinkOptions;
 import org.apache.hudi.configuration.HadoopConfigurations;
 import org.apache.hudi.source.stats.ColumnStatsIndices;
-import org.apache.hudi.source.stats.ExpressionEvaluator;
 import org.apache.hudi.util.DataTypeUtils;
-import org.apache.hudi.util.ExpressionUtils;
-import org.apache.hudi.util.FlinkClientUtil;
 import org.apache.hudi.util.StreamerUtil;
 
 import org.apache.flink.annotation.VisibleForTesting;
@@ -68,17 +65,14 @@ public class FileIndex {
   private List<String> partitionPaths;      // cache of partition paths
   private List<ResolvedExpression> filters; // push down filters
   private final boolean tableExists;
-  private final org.apache.hadoop.conf.Configuration hadoopConf;
+  private DataPruner dataPruner;
 
   private FileIndex(Path path, Configuration conf, RowType rowType) {
     this.path = path;
     this.rowType = rowType;
     this.metadataConfig = metadataConfig(conf);
     this.dataSkippingEnabled = conf.getBoolean(FlinkOptions.READ_DATA_SKIPPING_ENABLED);
-    hadoopConf = FlinkClientUtil.getHadoopConf();
-    conf.toMap().forEach(hadoopConf::set);
-    this.tableExists = StreamerUtil.tableExists(path.toString(), hadoopConf);
-//    this.tableExists = StreamerUtil.tableExists(path.toString(), HadoopConfigurations.getHadoopConf(conf));
+    this.tableExists = StreamerUtil.tableExists(path.toString(), HadoopConfigurations.getHadoopConf(conf));
   }
 
   public static FileIndex instance(Path path, Configuration conf, RowType rowType) {
@@ -142,7 +136,7 @@ public class FileIndex {
       return new FileStatus[0];
     }
     String[] partitions = getOrBuildPartitionPaths().stream().map(p -> fullPartitionPath(path, p)).toArray(String[]::new);
-    FileStatus[] allFileStatus = FSUtils.getFilesInPartitions(new HoodieFlinkEngineContext(hadoopConf), metadataConfig, path.toString(),
+    FileStatus[] allFileStatus = FSUtils.getFilesInPartitions(HoodieFlinkEngineContext.DEFAULT, metadataConfig, path.toString(),
             partitions)
         .values().stream().flatMap(Arrays::stream).toArray(FileStatus[]::new);
     Set<String> candidateFiles = candidateFilesInMetadataTable(allFileStatus);
@@ -150,9 +144,16 @@ public class FileIndex {
       // no need to filter by col stats or error occurs.
       return allFileStatus;
     }
-    return Arrays.stream(allFileStatus).parallel()
+    FileStatus[] results = Arrays.stream(allFileStatus).parallel()
         .filter(fileStatus -> candidateFiles.contains(fileStatus.getPath().getName()))
         .toArray(FileStatus[]::new);
+    double totalFileSize = allFileStatus.length;
+    double resultFileSize = results.length;
+    double skippingPercent = totalFileSize != 0 ? (totalFileSize - resultFileSize) / totalFileSize : 0;
+    LOG.info("Total files: " + totalFileSize
+        + "; candidate files after data skipping: " + resultFileSize
+        + "; skipping percent " + skippingPercent);
+    return results;
   }
 
   /**
@@ -196,6 +197,7 @@ public class FileIndex {
   public void setFilters(List<ResolvedExpression> filters) {
     if (filters.size() > 0) {
       this.filters = new ArrayList<>(filters);
+      this.dataPruner = initializeDataPruner(filters);
     }
   }
 
@@ -218,24 +220,11 @@ public class FileIndex {
    */
   @Nullable
   private Set<String> candidateFilesInMetadataTable(FileStatus[] allFileStatus) {
-    // NOTE: Data Skipping is only effective when it references columns that are indexed w/in
-    //       the Column Stats Index (CSI). Following cases could not be effectively handled by Data Skipping:
-    //          - Expressions on top-level column's fields (ie, for ex filters like "struct.field > 0", since
-    //          CSI only contains stats for top-level columns, in this case for "struct")
-    //          - Any expression not directly referencing top-level column (for ex, sub-queries, since there's
-    //          nothing CSI in particular could be applied for)
-    if (!metadataConfig.enabled() || !dataSkippingEnabled) {
-      validateConfig();
-      return null;
-    }
-    if (this.filters == null || this.filters.size() == 0) {
-      return null;
-    }
-    String[] referencedCols = ExpressionUtils.referencedColumns(filters);
-    if (referencedCols.length == 0) {
+    if (dataPruner == null) {
       return null;
     }
     try {
+      String[] referencedCols = dataPruner.getReferencedCols();
       final List<RowData> colStats = ColumnStatsIndices.readColumnStatsIndex(path.toString(), metadataConfig, referencedCols);
       final Pair<List<RowData>, String[]> colStatsTable = ColumnStatsIndices.transposeColumnStatsIndex(colStats, referencedCols, rowType);
       List<RowData> transposedColStats = colStatsTable.getLeft();
@@ -250,7 +239,7 @@ public class FileIndex {
           .map(row -> row.getString(0).toString())
           .collect(Collectors.toSet());
       Set<String> candidateFileNames = transposedColStats.stream().parallel()
-          .filter(row -> ExpressionEvaluator.filterExprs(filters, row, queryFields))
+          .filter(row -> dataPruner.test(row, queryFields))
           .map(row -> row.getString(0).toString())
           .collect(Collectors.toSet());
 
@@ -290,8 +279,7 @@ public class FileIndex {
       return this.partitionPaths;
     }
     this.partitionPaths = this.tableExists
-//        ? FSUtils.getAllPartitionPaths(HoodieFlinkEngineContext.DEFAULT, metadataConfig, path.toString())
-          ? FSUtils.getAllPartitionPaths(new HoodieFlinkEngineContext(hadoopConf), metadataConfig, path.toString())
+        ? FSUtils.getAllPartitionPaths(HoodieFlinkEngineContext.DEFAULT, metadataConfig, path.toString())
         : Collections.emptyList();
     return this.partitionPaths;
   }
@@ -308,5 +296,19 @@ public class FileIndex {
   @VisibleForTesting
   public List<ResolvedExpression> getFilters() {
     return filters;
+  }
+
+  private DataPruner initializeDataPruner(List<ResolvedExpression> filters) {
+    // NOTE: Data Skipping is only effective when it references columns that are indexed w/in
+    //       the Column Stats Index (CSI). Following cases could not be effectively handled by Data Skipping:
+    //          - Expressions on top-level column's fields (ie, for ex filters like "struct.field > 0", since
+    //          CSI only contains stats for top-level columns, in this case for "struct")
+    //          - Any expression not directly referencing top-level column (for ex, sub-queries, since there's
+    //          nothing CSI in particular could be applied for)
+    if (!metadataConfig.enabled() || !dataSkippingEnabled) {
+      validateConfig();
+      return null;
+    }
+    return DataPruner.newInstance(filters);
   }
 }
