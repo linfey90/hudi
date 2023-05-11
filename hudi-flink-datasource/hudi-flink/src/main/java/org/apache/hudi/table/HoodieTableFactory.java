@@ -88,10 +88,12 @@ public class HoodieTableFactory implements DynamicTableSourceFactory, DynamicTab
     if (catalog != null) {
       hiveConf = catalog.getHiveConf();
     }
-    setupTableOptions(conf.getString(FlinkOptions.PATH), conf, hiveConf);
+//    setupTableOptions(conf.getString(FlinkOptions.PATH), conf, hiveConf);
+
+    setupTableOptions(conf.getString(FlinkOptions.PATH), conf);
     ResolvedSchema schema = context.getCatalogTable().getResolvedSchema();
     setupConfOptions(conf, context.getObjectIdentifier(), context.getCatalogTable(), schema);
-    hiveConf.iterator().forEachRemaining((Map.Entry<String, String> entry) -> conf.setString(entry.getKey(), entry.getValue()));
+//    hiveConf.iterator().forEachRemaining((Map.Entry<String, String> entry) -> conf.setString(entry.getKey(), entry.getValue()));
     return new HoodieTableSource(
         schema,
         path,
@@ -109,7 +111,8 @@ public class HoodieTableFactory implements DynamicTableSourceFactory, DynamicTab
     if (catalog != null) {
       hiveConf = catalog.getHiveConf();
     }
-    setupTableOptions(conf.getString(FlinkOptions.PATH), conf, hiveConf);
+//    setupTableOptions(conf.getString(FlinkOptions.PATH), conf, hiveConf);
+    setupTableOptions(conf.getString(FlinkOptions.PATH), conf);
     ResolvedSchema schema = context.getCatalogTable().getResolvedSchema();
     sanityCheck(conf, schema);
     setupConfOptions(conf, context.getObjectIdentifier(), context.getCatalogTable(), schema);

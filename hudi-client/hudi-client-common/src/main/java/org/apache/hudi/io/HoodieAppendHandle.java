@@ -429,9 +429,12 @@ public class HoodieAppendHandle<T, I, K, O> extends HoodieWriteHandle<T, I, K, O
 
   public void doAppend() {
     while (recordItr.hasNext()) {
+      // 获取记录
       HoodieRecord record = recordItr.next();
       init(record);
+      // 刷盘
       flushToDiskIfRequired(record, false);
+      // 写入缓存
       writeToBuffer(record);
     }
     appendDataAndDeleteBlocks(header, true);
@@ -448,7 +451,7 @@ public class HoodieAppendHandle<T, I, K, O> extends HoodieWriteHandle<T, I, K, O
       header.put(HoodieLogBlock.HeaderMetadataType.INSTANT_TIME, instantTime);
       header.put(HoodieLogBlock.HeaderMetadataType.SCHEMA, writeSchemaWithMetaFields.toString());
       List<HoodieLogBlock> blocks = new ArrayList<>(2);
-      if (recordList.size() > 0) {
+      if (recordList.size() > 0) {// 新插入的记录不为空
         String keyField = config.populateMetaFields()
             ? HoodieRecord.RECORD_KEY_METADATA_FIELD
             : hoodieTable.getMetaClient().getTableConfig().getRecordKeyFieldProp();
@@ -565,8 +568,9 @@ public class HoodieAppendHandle<T, I, K, O> extends HoodieWriteHandle<T, I, K, O
     }
     // fetch the ordering val first in case the record was deflated.
     final Comparable<?> orderingVal = record.getOrderingValue(writeSchema, recordProperties);
+    // 获取IndexedRecord便于写入log文件
     Option<HoodieRecord> indexedRecord = prepareRecord(record);
-    if (indexedRecord.isPresent()) {
+    if (indexedRecord.isPresent()) {// 存在表示是新插入的记录
       // Skip the ignored record.
       try {
         if (!indexedRecord.get().shouldIgnore(writeSchema, recordProperties)) {
@@ -576,7 +580,7 @@ public class HoodieAppendHandle<T, I, K, O> extends HoodieWriteHandle<T, I, K, O
         writeStatus.markFailure(record, e, record.getMetadata());
         LOG.error("Error writing record  " + indexedRecord.get(), e);
       }
-    } else {
+    } else {// 不存在表示需要删除
       recordsToDelete.add(DeleteRecord.create(record.getKey(), orderingVal));
     }
     numberOfRecords++;

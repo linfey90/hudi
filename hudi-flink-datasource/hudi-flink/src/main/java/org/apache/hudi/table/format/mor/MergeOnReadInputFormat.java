@@ -744,6 +744,7 @@ public class MergeOnReadInputFormat
 
     @Override
     public boolean hasNext() {
+      // todo fy readLogs初始为false，即先读base文件
       while (!readLogs && this.nested.hasNext()) {
         currentRecord = this.nested.next();
         if (instantRange != null) {

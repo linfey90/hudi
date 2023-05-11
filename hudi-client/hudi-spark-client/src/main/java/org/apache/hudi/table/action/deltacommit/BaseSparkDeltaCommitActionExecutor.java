@@ -77,7 +77,7 @@ public abstract class BaseSparkDeltaCommitActionExecutor<T>
         && mergeOnReadUpsertPartitioner.getSmallFileIds().contains(fileId)) {
       LOG.info("Small file corrections for updates for commit " + instantTime + " for file " + fileId);
       return super.handleUpdate(partitionPath, fileId, recordItr);
-    } else {
+    } else {//在处理 update时，如果日志文件不支持索引或者文件不是小文件
       HoodieAppendHandle<?, ?, ?, ?> appendHandle = new HoodieAppendHandle<>(config, instantTime, table,
           partitionPath, fileId, recordItr, taskContextSupplier);
       appendHandle.doAppend();

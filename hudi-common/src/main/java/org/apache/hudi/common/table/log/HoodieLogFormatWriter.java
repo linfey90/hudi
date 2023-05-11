@@ -190,7 +190,7 @@ public class HoodieLogFormatWriter implements HoodieLogFormat.Writer {
       }
       sizeWritten +=  outputStream.size() - startSize;
     }
-    // Flush all blocks to disk
+    // Flush all blocks to disk.调用 flush将数据写入文件，如果需要可能会滚动至下个日志文件
     flush();
 
     AppendResult result = new AppendResult(logFile, startPos, sizeWritten);

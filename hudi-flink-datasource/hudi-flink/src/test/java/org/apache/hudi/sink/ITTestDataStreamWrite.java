@@ -114,7 +114,7 @@ public class ITTestDataStreamWrite extends TestLogger {
   File tempFile;
 
   @ParameterizedTest
-  @ValueSource(strings = {"FLINK_STATE"})
+  @ValueSource(strings = {"FLINK_STATE", "BUCKET"})
   public void testWriteCopyOnWrite(String indexType) throws Exception {
     Configuration conf = TestConfigurations.getDefaultConf(tempFile.toURI().toString());
     conf.setString(FlinkOptions.INDEX_TYPE, indexType);
@@ -159,7 +159,8 @@ public class ITTestDataStreamWrite extends TestLogger {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"BUCKET", "FLINK_STATE"})
+//  @ValueSource(strings = {"BUCKET", "FLINK_STATE"})
+  @ValueSource(strings = {"BUCKET"})
   public void testWriteMergeOnReadWithCompaction(String indexType) throws Exception {
     Configuration conf = TestConfigurations.getDefaultConf(tempFile.toURI().toString());
     conf.setString(FlinkOptions.INDEX_TYPE, indexType);

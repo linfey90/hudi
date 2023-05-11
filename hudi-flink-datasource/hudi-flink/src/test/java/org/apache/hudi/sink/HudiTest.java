@@ -47,14 +47,20 @@ public class HudiTest {
 //            + "    'mode'='hms'"
 //            + "  )");
 
-    tblEnv.executeSql("CREATE CATALOG hoodie_catalog" +
-            "  WITH (" +
-            "    'type'='hudi'," +
-            " 'catalog.path'='s3a://test/hoodie_catalog'," +
-            "    'hive.conf.dir' = '/home/ideaworkspace/deepexi/dlink-catalog-manager/catalog_manager/src/test/resources/'," +
-            "    'mode'='hms'" +
-            "  )");
+//    tblEnv.executeSql("CREATE CATALOG hoodie_catalog" +
+//            "  WITH (" +
+//            "    'type'='hudi'," +
+//            " 'catalog.path'='s3a://test/hoodie_catalog'," +
+//            "    'hive.conf.dir' = '/home/ideaworkspace/deepexi/dlink-catalog-manager/catalog_manager/src/test/resources/'," +
+//            "    'mode'='hms'" +
+//            "  )");
 
+    tblEnv.executeSql("CREATE CATALOG hoodie_catalog"
+            + "  WITH ("
+            + "    'type'='hudi',"
+            + " 'catalog.path'='hdfs://node10:9000/user/fy/',"
+            + "    'mode'='dfs'"
+            + "  )");
 
     // 2.使用当前Catalog
     tblEnv.useCatalog("hoodie_catalog");
@@ -63,21 +69,21 @@ public class HudiTest {
 //    tblEnv.executeSql("create database hudi_db");
 
     // 4.使用数据库
-    tblEnv.useDatabase("hudi_db");
-
-    ////     5.创建iceberg表
-//        tblEnv.executeSql("CREATE TABLE hudi_table2(\n" +
-//                "  id int PRIMARY KEY NOT ENFORCED, \n" +
-//                "  name string\n" +
-//                ")\n" +
-//                "WITH (\n" +
-//                "'connector' = 'hudi',\n" +
-//                "'table.type' = 'COPY_ON_WRITE'" +
-//                ")");
+    tblEnv.useDatabase("huditest");
+//    tblEnv.executeSql("drop table hudi_table");
+//    ////     5.创建iceberg表
+//    tblEnv.executeSql("CREATE TABLE hudi_table(\n" +
+//            "  id int PRIMARY KEY NOT ENFORCED, \n" +
+//            "  name string\n" +
+//            ")\n" +
+//            "WITH (\n" +
+//            "'connector' = 'hudi',\n" +
+//            "'table.type' = 'MERGE_ON_READ'" +
+//            ")");
 
     tblEnv.executeSql(String.format("select id,name from %s", "hudi_table")).print();
     // 6.写入数据到表 flink_iceberg_tbl
-//    tblEnv.executeSql("insert into flink_append values " +
+//    tblEnv.executeSql("insert into hudi_table values " +
 //             "(1,'aaa'),(2,'bbb'),(3,'ccc')");
 //            "(3,'ggg'),(4,'ddd'),(5,'fff')");
 

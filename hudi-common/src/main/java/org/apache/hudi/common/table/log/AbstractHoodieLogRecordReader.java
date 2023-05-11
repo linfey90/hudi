@@ -447,6 +447,7 @@ public abstract class AbstractHoodieLogRecordReader {
        *    c. targetRollbackInstants.
        */
       while (logFormatReaderWrapper.hasNext()) {
+        // 获取日志文件
         HoodieLogFile logFile = logFormatReaderWrapper.getLogFile();
         LOG.info("Scanning log file " + logFile);
         scannedLogFiles.add(logFile);
