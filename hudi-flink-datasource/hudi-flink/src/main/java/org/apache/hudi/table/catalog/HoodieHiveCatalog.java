@@ -104,7 +104,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.apache.flink.sql.parser.hive.ddl.SqlAlterHiveDatabase.ALTER_DATABASE_OP;
 import static org.apache.flink.sql.parser.hive.ddl.SqlAlterHiveDatabaseOwner.DATABASE_OWNER_NAME;
@@ -155,8 +154,8 @@ public class HoodieHiveCatalog extends AbstractCatalog {
   }
 
   @Override
-  public Optional<Factory> getFactory() {
-    return Optional.of(new HoodieTableFactory(this));
+  public java.util.Optional<Factory> getFactory() {
+    return java.util.Optional.of(new HoodieTableFactory(this));
   }
 
   @Override

@@ -91,10 +91,10 @@ public class HoodieTableFactory implements DynamicTableSourceFactory, DynamicTab
     if (null != catalog) {
       hiveConf = catalog.getHiveConf();
     }
-    setupTableOptions(conf.getString(FlinkOptions.PATH), conf, hiveConf);
+    hiveConf.iterator().forEachRemaining((Map.Entry<String, String> entry) -> conf.setString(entry.getKey(), entry.getValue()));
+    setupTableOptions(conf.getString(FlinkOptions.PATH), conf);
     ResolvedSchema schema = context.getCatalogTable().getResolvedSchema();
     setupConfOptions(conf, context.getObjectIdentifier(), context.getCatalogTable(), schema);
-    hiveConf.iterator().forEachRemaining((Map.Entry<String, String> entry) -> conf.setString(entry.getKey(), entry.getValue()));
     return new HoodieTableSource(
         schema,
         path,
@@ -112,21 +112,19 @@ public class HoodieTableFactory implements DynamicTableSourceFactory, DynamicTab
     if (null != catalog) {
       hiveConf = catalog.getHiveConf();
     }
-    setupTableOptions(conf.getString(FlinkOptions.PATH), conf, hiveConf);
+    hiveConf.iterator().forEachRemaining((Map.Entry<String, String> entry) -> conf.setString(entry.getKey(), entry.getValue()));
+    setupTableOptions(conf.getString(FlinkOptions.PATH), conf);
     ResolvedSchema schema = context.getCatalogTable().getResolvedSchema();
     sanityCheck(conf, schema);
     setupConfOptions(conf, context.getObjectIdentifier(), context.getCatalogTable(), schema);
-    hiveConf.iterator().forEachRemaining((Map.Entry<String, String> entry) -> conf.setString(entry.getKey(), entry.getValue()));
     return new HoodieTableSink(conf, schema);
   }
 
   /**
    * Supplement the table config options if not specified.
    */
-  private void setupTableOptions(String basePath, Configuration conf, HiveConf hiveConf) {
-    org.apache.hadoop.conf.Configuration hadoopConf = HadoopConfigurations.getHadoopConf(conf);
-    hadoopConf.iterator().forEachRemaining((Map.Entry<String, String> entry) -> hiveConf.set(entry.getKey(), entry.getValue()));
-    StreamerUtil.getTableConfig(basePath, hiveConf)
+  private void setupTableOptions(String basePath, Configuration conf) {
+    StreamerUtil.getTableConfig(basePath, HadoopConfigurations.getAllHadoopConf(conf))
         .ifPresent(tableConfig -> {
           if (tableConfig.contains(HoodieTableConfig.RECORDKEY_FIELDS)
               && !conf.contains(FlinkOptions.RECORD_KEY_FIELD)) {
